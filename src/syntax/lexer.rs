@@ -202,18 +202,27 @@ where
     fn lex_number_starting_with_0(&mut self) -> Result<(), LexingError> {
         self.col_num += 1;
         self.chars.next();
-        if let Some((_, c2)) = self.chars.peek() {
+        if let Some(&(i, c2)) = self.chars.peek() {
             return match c2 {
                 'b' | 'B' => {
-                    self.lex_number_with_alt_base(2, |c| matches!(c, '0'..='1'), Token::Binary)
+                    self.lex_number_with_alt_base(2, |c| matches!(c, '0'..='1'), Token::Binary, i)
                 }
-                'x' | 'X' => {
-                    self.lex_number_with_alt_base(16, |c| c.is_ascii_hexdigit(), Token::Hexadecimal)
-                }
+                'x' | 'X' => self.lex_number_with_alt_base(
+                    16,
+                    |c| c.is_ascii_hexdigit(),
+                    Token::Hexadecimal,
+                    i,
+                ),
                 'o' | 'O' => {
-                    self.lex_number_with_alt_base(8, |c| matches!(c, '0'..='7'), Token::Octal)
+                    self.lex_number_with_alt_base(8, |c| matches!(c, '0'..='7'), Token::Octal, i)
                 }
-                '0'..='9' => self.lex_number_with_leading_0_but_2nd_char_is_digit(),
+                '0'..='9' => self.lex_number_with_leading_0_but_2nd_char_is_digit(i),
+                'n' => {
+                    self.tokens.push(Token::BigInt(&self.input[(i - 1)..=i]));
+                    self.col_num += 1;
+                    self.chars.next();
+                    Ok(())
+                }
                 _ => {
                     self.tokens.push(Token::Decimal(0.0.into()));
                     Ok(())
@@ -244,6 +253,7 @@ where
         radix: u32,
         matcher: M,
         token_fn: T,
+        i: usize,
     ) -> Result<(), LexingError>
     where
         M: Fn(char) -> bool,
@@ -252,31 +262,51 @@ where
         let mut num_str = String::new();
         self.col_num += 1;
         self.chars.next();
+        let mut is_big = false;
         while let Some(&(_, c3)) = self.chars.peek()
-            && matcher(c3)
+            && (matcher(c3) || c3 == 'n')
+            && !is_big
         {
+            if c3 == 'n' {
+                is_big = true;
+            }
             num_str.push(c3);
             self.col_num += 1;
             self.chars.next();
         }
-        let token = self.try_parse_int_token(num_str, radix, token_fn)?;
+        let token = if is_big {
+            Token::BigInt(&self.input[(i - 1)..=(i + num_str.len())])
+        } else {
+            self.try_parse_int_token(num_str, radix, token_fn)?
+        };
         self.tokens.push(token);
         Ok(())
     }
 
     #[inline]
-    fn lex_number_with_leading_0_but_2nd_char_is_digit(&mut self) -> Result<(), LexingError> {
+    fn lex_number_with_leading_0_but_2nd_char_is_digit(
+        &mut self,
+        i: usize,
+    ) -> Result<(), LexingError> {
         let mut num_str = String::new();
         let mut is_octal = true;
+        let mut is_big = false;
         while let Some(&(_, c3)) = self.chars.peek()
-            && c3.is_ascii_digit()
+            && matches!(c3, '0'..='9' | 'n')
+            && !is_big
         {
+            if c3 == 'n' {
+                is_big = true;
+            }
             num_str.push(c3);
             self.col_num += 1;
             self.chars.next();
             is_octal = is_octal && matches!(c3, '0'..='7');
         }
-        if is_octal {
+        if is_big {
+            let token = Token::BigInt(&self.input[(i - 1)..(i + num_str.len())]);
+            self.tokens.push(token);
+        } else if is_octal {
             let token = self.try_parse_int_token(num_str, 8, Token::Octal)?;
             self.tokens.push(token);
         } else {
@@ -306,6 +336,7 @@ where
         let mut has_decimal_point = false;
         self.col_num += 1;
         self.chars.next();
+        let mut is_big = false;
         while let Some(&(_, c2)) = self.chars.peek() {
             match c2 {
                 '_' => {
@@ -356,10 +387,23 @@ where
                     self.col_num += 1;
                     self.chars.next();
                 }
+                'n' => {
+                    is_big = true;
+                    end += 1;
+                    num_str.push('n');
+                    self.col_num += 1;
+                    self.chars.next();
+                    break;
+                }
                 _ => {
                     break;
                 }
             }
+        }
+
+        if is_big {
+            self.tokens.push(Token::BigInt(&self.input[start..=end]));
+            return Ok(());
         }
 
         let base = num_str.parse::<f64>().map_err(|e| {
@@ -462,6 +506,21 @@ mod tests {
     #[case("08", Token::Decimal(8.0.into()))]
     #[case("09", Token::Decimal(9.0.into()))]
     #[case("0989", Token::Decimal(989.0.into()))]
+    #[case("1n", Token::BigInt("1n"))]
+    #[case("99n", Token::BigInt("99n"))]
+    #[case("0b1n", Token::BigInt("0b1n"))]
+    #[case("0B1n", Token::BigInt("0B1n"))]
+    #[case("0b101n", Token::BigInt("0b101n"))]
+    #[case("0xfn", Token::BigInt("0xfn"))]
+    #[case("0XFn", Token::BigInt("0XFn"))]
+    #[case("0xFFn", Token::BigInt("0xFFn"))]
+    #[case("0o7n", Token::BigInt("0o7n"))]
+    #[case("0O7n", Token::BigInt("0O7n"))]
+    #[case("0o77n", Token::BigInt("0o77n"))]
+    #[case("07n", Token::BigInt("07n"))]
+    #[case("08n", Token::BigInt("08n"))]
+    #[case("077n", Token::BigInt("077n"))]
+    #[case("088n", Token::BigInt("088n"))]
     fn single_token(#[case] s: &str, #[case] expected: Token) {
         let tokens = lex(s).expect("failed to lex");
         assert_eq!(expected, tokens[0]);
@@ -536,6 +595,11 @@ mod tests {
     #[case("0xAb 0XcD 0xEF", vec![Token::Hexadecimal(0xAB), Token::WhiteSpace, Token::Hexadecimal(0xCD), Token::WhiteSpace, Token::Hexadecimal(0xEF), Token::Eof])]
     #[case("0b111 0B1010 0b000", vec![Token::Binary(0b111), Token::WhiteSpace, Token::Binary(0b1010), Token::WhiteSpace, Token::Binary(0b0), Token::Eof])]
     #[case("0o123 077 090 0O70", vec![Token::Octal(0o123), Token::WhiteSpace, Token::Octal(0o77), Token::WhiteSpace, Token::Decimal(90.0.into()), Token::WhiteSpace, Token::Octal(0o70), Token::Eof])]
+    #[case("0n 1n 9n", vec![Token::BigInt("0n"), Token::WhiteSpace, Token::BigInt("1n"), Token::WhiteSpace, Token::BigInt("9n"), Token::Eof])]
+    #[case("0x0n 0Xfn 0xFn", vec![Token::BigInt("0x0n"), Token::WhiteSpace, Token::BigInt("0Xfn"), Token::WhiteSpace, Token::BigInt("0xFn"), Token::Eof])]
+    #[case("0b1n 0B1n 0b101n", vec![Token::BigInt("0b1n"), Token::WhiteSpace, Token::BigInt("0B1n"), Token::WhiteSpace, Token::BigInt("0b101n"), Token::Eof])]
+    #[case("0o0n 0O7n 0o77n", vec![Token::BigInt("0o0n"), Token::WhiteSpace, Token::BigInt("0O7n"), Token::WhiteSpace, Token::BigInt("0o77n"), Token::Eof])]
+    #[case("00n 07n 08n", vec![Token::BigInt("00n"), Token::WhiteSpace, Token::BigInt("07n"), Token::WhiteSpace, Token::BigInt("08n"), Token::Eof])]
     fn numbers(#[case] s: &str, #[case] expected: Vec<Token>) {
         let tokens = lex(s).expect("failed to lex");
         assert_eq!(expected, tokens);
@@ -557,6 +621,7 @@ mod tests {
     #[case("0b0 0b101 0B1", vec![3, 4, 9, 10, 13])]
     #[case("0o1 0777 0O0", vec![3, 4, 8, 9, 12])]
     #[case("0 0xF 0b1 0o7 077 9", vec![1, 2, 5, 6, 9, 10, 13, 14, 17, 18, 19])]
+    #[case("0n 0xFn 0b1n 0o7n 077n 9n", vec![2, 3, 7, 8, 12, 13, 17, 18, 22, 23, 25])]
     fn columns_numbers(#[case] s: &str, #[case] expected: Vec<usize>) {
         let mut lexer = Lexer::new(s);
         for col in expected {
