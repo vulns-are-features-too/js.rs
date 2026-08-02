@@ -57,6 +57,13 @@ where
         }
     }
 
+    const fn curr_point(&self) -> Point {
+        Point {
+            line: self.line_num,
+            column: self.col_num,
+        }
+    }
+
     fn lex_one(&mut self) -> Result<bool, LexingError> {
         if let Some(&(i, c)) = self.chars.peek() {
             match c {
@@ -128,10 +135,7 @@ where
                 }
 
                 _ => {
-                    return Err(LexingError::invalid_char(
-                        Point::new(self.line_num, self.col_num),
-                        c,
-                    ));
+                    return Err(LexingError::invalid_char(self.curr_point(), c));
                 }
             }
             return Ok(true);
@@ -233,10 +237,7 @@ where
         match i64::from_str_radix(&num_str, radix) {
             Ok(i) => Ok(token_fn(i)),
             Err(e) => Err(LexingError::InvalidNumber {
-                point: Point {
-                    line: self.line_num,
-                    column: self.col_num,
-                },
+                point: self.curr_point(),
                 num_str,
                 parse_err: e.to_string(),
             }),
@@ -290,10 +291,7 @@ where
                 }
                 Err(e) => {
                     return Err(LexingError::InvalidNumber {
-                        point: Point {
-                            line: self.line_num,
-                            column: self.col_num,
-                        },
+                        point: self.curr_point(),
                         num_str,
                         parse_err: e.to_string(),
                     });
@@ -381,7 +379,7 @@ where
                         }
                         Err(e) => {
                             return Err(LexingError::invalid_number(
-                                Point::new(self.line_num, self.col_num),
+                                self.curr_point(),
                                 self.input[start..end].to_string(),
                                 e.to_string(),
                             ));
@@ -393,7 +391,7 @@ where
             }
             Err(e) => {
                 return Err(LexingError::invalid_number(
-                    Point::new(self.line_num, self.col_num),
+                    self.curr_point(),
                     self.input[start..end].to_string(),
                     e.to_string(),
                 ));
