@@ -129,6 +129,32 @@ pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError>
                 if let Some((_, c2)) = chars.peek() {
                     let mut num_str = String::new();
                     match c2 {
+                        'b' | 'B' => {
+                            col_num += 1;
+                            chars.next();
+                            while let Some(&(_, c3)) = chars.peek()
+                                && matches!(c3, '0' | '1')
+                            {
+                                num_str.push(c3);
+                                col_num += 1;
+                                chars.next();
+                            }
+                            match i64::from_str_radix(&num_str, 2) {
+                                Ok(i) => {
+                                    tokens.push(Token::Binary(i));
+                                }
+                                Err(e) => {
+                                    return Err(LexingError::InvalidNumber {
+                                        point: Point {
+                                            line: line_num,
+                                            column: col_num,
+                                        },
+                                        num_str,
+                                        parse_err: e.to_string(),
+                                    });
+                                }
+                            }
+                        }
                         'x' | 'X' => {
                             col_num += 1;
                             chars.next();
@@ -326,6 +352,10 @@ mod tests {
     #[case("0x123456789", Token::Hexadecimal(0x123456789))]
     #[case("0xABCDEF0", Token::Hexadecimal(0xABCDEF0))]
     #[case("0xabcdef0", Token::Hexadecimal(0xABCDEF0))]
+    #[case("0b1010", Token::Binary(0b1010))]
+    #[case("0B0101", Token::Binary(0b0101))]
+    #[case("0b111", Token::Binary(0b111))]
+    #[case("0b000", Token::Binary(0b0))]
     fn single_token(#[case] s: &str, #[case] expected: Token) {
         let tokens = lex(s).expect("failed to lex");
         assert_eq!(expected, tokens[0]);
@@ -398,6 +428,7 @@ mod tests {
     #[case("0x0 0x0 0x0", vec![Token::Hexadecimal(0), Token::WhiteSpace, Token::Hexadecimal(0), Token::WhiteSpace, Token::Hexadecimal(0), Token::Eof])]
     #[case("0x1 0X2 0x3", vec![Token::Hexadecimal(1), Token::WhiteSpace, Token::Hexadecimal(2), Token::WhiteSpace, Token::Hexadecimal(3), Token::Eof])]
     #[case("0xAb 0XcD 0xEF", vec![Token::Hexadecimal(0xAB), Token::WhiteSpace, Token::Hexadecimal(0xCD), Token::WhiteSpace, Token::Hexadecimal(0xEF), Token::Eof])]
+    #[case("0b111 0B1010 0b000", vec![Token::Binary(0b111), Token::WhiteSpace, Token::Binary(0b1010), Token::WhiteSpace, Token::Binary(0b0), Token::Eof])]
     fn numbers(#[case] s: &str, #[case] expected: Vec<Token>) {
         let tokens = lex(s).expect("failed to lex");
         assert_eq!(expected, tokens);
