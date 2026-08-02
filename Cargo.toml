@@ -1,0 +1,17 @@
+[package]
+name = "js"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[lints.clippy]
+# cargo = "warn"
+# nursery = "warn"
+# pedantic = "warn"
+
+[lints.rust]
+future-incompatible = "deny"
+keyword-idents = "deny"
+nonstandard-style = "deny"
+dead-code = "allow"
