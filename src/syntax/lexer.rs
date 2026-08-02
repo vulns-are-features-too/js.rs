@@ -362,36 +362,29 @@ where
             }
         }
 
-        match num_str.parse::<f64>() {
-            Ok(f) => {
-                if has_exp {
-                    match exponent.parse::<i64>() {
-                        Ok(i) => {
-                            self.tokens.push(Token::Exponential {
-                                base: f.into(),
-                                exp: i,
-                            });
-                        }
-                        Err(e) => {
-                            return Err(LexingError::invalid_number(
-                                self.curr_point(),
-                                self.input[start..end].to_string(),
-                                e.to_string(),
-                            ));
-                        }
-                    }
-                } else {
-                    self.tokens.push(Token::Decimal((f).into()));
-                }
-            }
-            Err(e) => {
-                return Err(LexingError::invalid_number(
-                    self.curr_point(),
-                    self.input[start..end].to_string(),
-                    e.to_string(),
-                ));
-            }
+        let base = num_str.parse::<f64>().map_err(|e| {
+            LexingError::invalid_number(
+                self.curr_point(),
+                self.input[start..end].to_string(),
+                e.to_string(),
+            )
+        })?;
+
+        if has_exp {
+            self.tokens.push(Token::Exponential {
+                base: base.into(),
+                exp: exponent.parse::<i64>().map_err(|e| {
+                    LexingError::invalid_number(
+                        self.curr_point(),
+                        self.input[start..end].to_string(),
+                        e.to_string(),
+                    )
+                })?,
+            });
+        } else {
+            self.tokens.push(Token::Decimal(base.into()));
         }
+
         Ok(())
     }
 }
