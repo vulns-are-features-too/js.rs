@@ -1,3 +1,8 @@
+use std::{
+    iter::{Enumerate, Peekable},
+    str::Chars,
+};
+
 use crate::syntax::{locations::Point, tokens::Token};
 
 #[derive(Debug)]
@@ -27,342 +32,420 @@ impl LexingError {
     }
 }
 
-pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError> {
-    let mut chars = s.chars().enumerate().peekable();
-    let mut line_num = 0;
-    let mut col_num = 0;
-    let mut tokens = vec![];
+struct Lexer<'i, 'o>
+where
+    'i: 'o,
+{
+    input: &'i str,
+    chars: Peekable<Enumerate<Chars<'i>>>,
+    line_num: usize,
+    col_num: usize,
+    tokens: Vec<Token<'o>>,
+}
 
-    while let Some((i, c)) = chars.peek() {
-        match c {
-            // whitespace
-            ' ' | '\t' => {
-                tokens.push(Token::WhiteSpace);
-                col_num += 1;
-                chars.next();
-                while let Some(&(_, c2)) = chars.peek()
-                    && matches!(c2, ' ' | '\t')
-                {
-                    col_num += 1;
-                    chars.next();
-                }
-            }
-            '\n' => {
-                tokens.push(Token::NewLine);
-                col_num = 0;
-                line_num += 1;
-                chars.next();
-            }
-            '\r' => {
-                tokens.push(Token::NewLine);
-                col_num = 0;
-                line_num += 1;
-                chars.next();
-                if let Some(&(_, c2)) = chars.peek()
-                    && c2 == '\n'
-                {
-                    chars.next();
-                }
-            }
-
-            // single char
-            ';' => {
-                tokens.push(Token::SemiColon);
-                col_num += 1;
-                chars.next();
-            }
-            ':' => {
-                tokens.push(Token::Colon);
-                col_num += 1;
-                chars.next();
-            }
-            '(' => {
-                tokens.push(Token::LeftParen);
-                col_num += 1;
-                chars.next();
-            }
-            ')' => {
-                tokens.push(Token::RightParen);
-                col_num += 1;
-                chars.next();
-            }
-            '[' => {
-                tokens.push(Token::LeftBracket);
-                col_num += 1;
-                chars.next();
-            }
-            ']' => {
-                tokens.push(Token::RightBracket);
-                col_num += 1;
-                chars.next();
-            }
-            '{' => {
-                tokens.push(Token::LeftBrace);
-                col_num += 1;
-                chars.next();
-            }
-            '}' => {
-                tokens.push(Token::RightBrace);
-                col_num += 1;
-                chars.next();
-            }
-
-            // identifier or keyword
-            'a'..='z' | 'A'..='Z' | '_' => {
-                let start = *i;
-                let mut end = start;
-                while let Some(&(_, c2)) = chars.peek()
-                    && (c2.is_alphanumeric() || c2 == '_')
-                {
-                    end += 1;
-                    col_num += 1;
-                    chars.next();
-                }
-                tokens.push(Token::Identifier(&s[start..end]));
-            }
-
-            // numbers
-            '0' => {
-                col_num += 1;
-                chars.next();
-                if let Some((_, c2)) = chars.peek() {
-                    let mut num_str = String::new();
-                    match c2 {
-                        'b' | 'B' => {
-                            col_num += 1;
-                            chars.next();
-                            while let Some(&(_, c3)) = chars.peek()
-                                && matches!(c3, '0' | '1')
-                            {
-                                num_str.push(c3);
-                                col_num += 1;
-                                chars.next();
-                            }
-                            match i64::from_str_radix(&num_str, 2) {
-                                Ok(i) => {
-                                    tokens.push(Token::Binary(i));
-                                }
-                                Err(e) => {
-                                    return Err(LexingError::InvalidNumber {
-                                        point: Point {
-                                            line: line_num,
-                                            column: col_num,
-                                        },
-                                        num_str,
-                                        parse_err: e.to_string(),
-                                    });
-                                }
-                            }
-                        }
-                        'x' | 'X' => {
-                            col_num += 1;
-                            chars.next();
-                            while let Some(&(_, c3)) = chars.peek()
-                                && c3.is_ascii_hexdigit()
-                            {
-                                num_str.push(c3);
-                                col_num += 1;
-                                chars.next();
-                            }
-                            match i64::from_str_radix(&num_str, 16) {
-                                Ok(i) => {
-                                    tokens.push(Token::Hexadecimal(i));
-                                }
-                                Err(e) => {
-                                    return Err(LexingError::InvalidNumber {
-                                        point: Point {
-                                            line: line_num,
-                                            column: col_num,
-                                        },
-                                        num_str,
-                                        parse_err: e.to_string(),
-                                    });
-                                }
-                            }
-                        }
-                        'o' | 'O' => {
-                            // TODO: handle no o & 8/9
-                            col_num += 1;
-                            chars.next();
-                            while let Some(&(_, c3)) = chars.peek()
-                                && matches!(c3, '0'..='7')
-                            {
-                                num_str.push(c3);
-                                col_num += 1;
-                                chars.next();
-                            }
-                            match i64::from_str_radix(&num_str, 8) {
-                                Ok(i) => {
-                                    tokens.push(Token::Octal(i));
-                                }
-                                Err(e) => {
-                                    return Err(LexingError::InvalidNumber {
-                                        point: Point {
-                                            line: line_num,
-                                            column: col_num,
-                                        },
-                                        num_str,
-                                        parse_err: e.to_string(),
-                                    });
-                                }
-                            }
-                        }
-                        '0'..='9' => {
-                            let mut is_octal = true;
-                            while let Some(&(_, c3)) = chars.peek()
-                                && c3.is_ascii_digit()
-                            {
-                                num_str.push(c3);
-                                col_num += 1;
-                                chars.next();
-                                is_octal = is_octal && matches!(c3, '0'..='7');
-                            }
-                            if is_octal {
-                                match i64::from_str_radix(&num_str, 8) {
-                                    Ok(i) => {
-                                        tokens.push(Token::Octal(i));
-                                    }
-                                    Err(e) => {
-                                        return Err(LexingError::InvalidNumber {
-                                            point: Point {
-                                                line: line_num,
-                                                column: col_num,
-                                            },
-                                            num_str,
-                                            parse_err: e.to_string(),
-                                        });
-                                    }
-                                }
-                            } else {
-                                match num_str.parse::<f64>() {
-                                    Ok(f) => {
-                                        tokens.push(Token::Decimal(f.into()));
-                                    }
-                                    Err(e) => {
-                                        return Err(LexingError::InvalidNumber {
-                                            point: Point {
-                                                line: line_num,
-                                                column: col_num,
-                                            },
-                                            num_str,
-                                            parse_err: e.to_string(),
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                        _ => tokens.push(Token::Decimal(0.0.into())),
-                    }
-                } else {
-                    tokens.push(Token::Decimal(0.0.into()));
-                }
-            }
-
-            '1'..='9' => {
-                let start = *i;
-                let mut end = *i;
-                let mut num_str = String::from(*c);
-                let mut exponent = String::new();
-                let mut has_exp = false;
-                let mut has_decimal_point = false;
-                col_num += 1;
-                chars.next();
-                while let Some(&(_, c2)) = chars.peek() {
-                    match c2 {
-                        '_' => {
-                            end += 1;
-                            col_num += 1;
-                            chars.next();
-                        }
-                        '0'..='9' => {
-                            if has_exp {
-                                exponent.push(c2);
-                            } else {
-                                num_str.push(c2);
-                            }
-                            end += 1;
-                            col_num += 1;
-                            chars.next();
-                        }
-                        'e' | 'E' => {
-                            if has_exp {
-                                break;
-                            }
-                            has_exp = true;
-                            end += 1;
-                            col_num += 1;
-                            chars.next();
-                            if let Some(&(_, c3)) = chars.peek()
-                                && !matches!(c3, '-' | '0'..='9')
-                            {
-                                break;
-                            }
-                        }
-                        '-' => {
-                            if !has_exp || !exponent.is_empty() {
-                                break;
-                            }
-                            exponent.push('-');
-                            end += 1;
-                            col_num += 1;
-                            chars.next();
-                        }
-                        '.' => {
-                            if has_decimal_point || has_exp {
-                                break;
-                            }
-                            has_decimal_point = true;
-                            end += 1;
-                            num_str.push('.');
-                            col_num += 1;
-                            chars.next();
-                        }
-                        _ => {
-                            break;
-                        }
-                    }
-                }
-
-                match num_str.parse::<f64>() {
-                    Ok(f) => {
-                        if has_exp {
-                            match exponent.parse::<i64>() {
-                                Ok(i) => {
-                                    tokens.push(Token::Exponential {
-                                        base: f.into(),
-                                        exp: i,
-                                    });
-                                }
-                                Err(e) => {
-                                    return Err(LexingError::invalid_number(
-                                        Point::new(line_num, col_num),
-                                        s[start..end].to_string(),
-                                        e.to_string(),
-                                    ));
-                                }
-                            }
-                        } else {
-                            tokens.push(Token::Decimal((f).into()));
-                        }
-                    }
-                    Err(e) => {
-                        return Err(LexingError::invalid_number(
-                            Point::new(line_num, col_num),
-                            s[start..end].to_string(),
-                            e.to_string(),
-                        ));
-                    }
-                }
-            }
-
-            _ => {
-                return Err(LexingError::invalid_char(Point::new(line_num, col_num), *c));
-            }
+impl<'i, 'o> Lexer<'i, 'o>
+where
+    'i: 'o,
+{
+    fn new(input: &'i str) -> Self {
+        Self {
+            input,
+            chars: input.chars().enumerate().peekable(),
+            line_num: 0,
+            col_num: 0,
+            tokens: vec![],
         }
     }
 
-    tokens.push(Token::Eof);
-    Ok(tokens)
+    fn lex(mut self) -> Result<Vec<Token<'o>>, LexingError> {
+        while let Some(&(i, c)) = self.chars.peek() {
+            match c {
+                // whitespace
+                ' ' | '\t' => {
+                    self.lex_whitespace();
+                }
+                '\n' => {
+                    self.lex_newline();
+                }
+                '\r' => {
+                    self.lex_carriage_return();
+                }
+
+                // single char
+                ';' => {
+                    self.tokens.push(Token::SemiColon);
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+                ':' => {
+                    self.tokens.push(Token::Colon);
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+                '(' => {
+                    self.tokens.push(Token::LeftParen);
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+                ')' => {
+                    self.tokens.push(Token::RightParen);
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+                '[' => {
+                    self.tokens.push(Token::LeftBracket);
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+                ']' => {
+                    self.tokens.push(Token::RightBracket);
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+                '{' => {
+                    self.tokens.push(Token::LeftBrace);
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+                '}' => {
+                    self.tokens.push(Token::RightBrace);
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+
+                // identifier or keyword
+                'a'..='z' | 'A'..='Z' | '_' => {
+                    self.lex_identifier_or_keyword(i);
+                }
+
+                // numbers
+                '0' => {
+                    self.lex_number_starting_with_0()?;
+                }
+
+                '1'..='9' => {
+                    self.lex_number_starting_with_1_to_9(i, c)?;
+                }
+
+                _ => {
+                    return Err(LexingError::invalid_char(
+                        Point::new(self.line_num, self.col_num),
+                        c,
+                    ));
+                }
+            }
+        }
+
+        self.tokens.push(Token::Eof);
+        Ok(self.tokens)
+    }
+
+    #[inline]
+    fn lex_whitespace(&mut self) {
+        self.tokens.push(Token::WhiteSpace);
+        self.col_num += 1;
+        self.chars.next();
+        while let Some((_, c2)) = &self.chars.peek()
+            && matches!(c2, ' ' | '\t')
+        {
+            self.col_num += 1;
+            self.chars.next();
+        }
+    }
+
+    #[inline]
+    fn lex_newline(&mut self) {
+        self.tokens.push(Token::NewLine);
+        self.col_num = 0;
+        self.line_num += 1;
+        self.chars.next();
+    }
+
+    #[inline]
+    fn lex_carriage_return(&mut self) {
+        self.tokens.push(Token::NewLine);
+        self.col_num = 0;
+        self.line_num += 1;
+        self.chars.next();
+        if let Some(&(_, c2)) = self.chars.peek()
+            && c2 == '\n'
+        {
+            self.chars.next();
+        }
+    }
+
+    #[inline]
+    fn lex_identifier_or_keyword(&mut self, i: usize) {
+        let start = i;
+        let mut end = start;
+        while let Some(&(_, c2)) = self.chars.peek()
+            && (c2.is_alphanumeric() || c2 == '_')
+        {
+            end += 1;
+            self.col_num += 1;
+            self.chars.next();
+        }
+        self.tokens.push(Token::Identifier(&self.input[start..end]));
+    }
+
+    #[inline]
+    fn lex_number_starting_with_0(&mut self) -> Result<(), LexingError> {
+        self.col_num += 1;
+        self.chars.next();
+        if let Some((_, c2)) = self.chars.peek() {
+            match c2 {
+                'b' | 'B' => self.lex_bin_number()?,
+                'x' | 'X' => self.lex_hex_number()?,
+                'o' | 'O' => self.lex_oct_number()?,
+                '0'..='9' => self.lex_number_with_leading_0_but_2nd_char_is_digit()?,
+                _ => self.tokens.push(Token::Decimal(0.0.into())),
+            }
+        } else {
+            self.tokens.push(Token::Decimal(0.0.into()));
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn lex_bin_number(&mut self) -> Result<(), LexingError> {
+        let mut num_str = String::new();
+        self.col_num += 1;
+        self.chars.next();
+        while let Some(&(_, c3)) = self.chars.peek()
+            && matches!(c3, '0' | '1')
+        {
+            num_str.push(c3);
+            self.col_num += 1;
+            self.chars.next();
+        }
+        match i64::from_str_radix(&num_str, 2) {
+            Ok(i) => {
+                self.tokens.push(Token::Binary(i));
+            }
+            Err(e) => {
+                return Err(LexingError::InvalidNumber {
+                    point: Point {
+                        line: self.line_num,
+                        column: self.col_num,
+                    },
+                    num_str,
+                    parse_err: e.to_string(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn lex_hex_number(&mut self) -> Result<(), LexingError> {
+        let mut num_str = String::new();
+        self.col_num += 1;
+        self.chars.next();
+        while let Some(&(_, c3)) = self.chars.peek()
+            && c3.is_ascii_hexdigit()
+        {
+            num_str.push(c3);
+            self.col_num += 1;
+            self.chars.next();
+        }
+        match i64::from_str_radix(&num_str, 16) {
+            Ok(i) => {
+                self.tokens.push(Token::Hexadecimal(i));
+            }
+            Err(e) => {
+                return Err(LexingError::InvalidNumber {
+                    point: Point {
+                        line: self.line_num,
+                        column: self.col_num,
+                    },
+                    num_str,
+                    parse_err: e.to_string(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn lex_oct_number(&mut self) -> Result<(), LexingError> {
+        let mut num_str = String::new();
+        self.col_num += 1;
+        self.chars.next();
+        while let Some(&(_, c3)) = self.chars.peek()
+            && matches!(c3, '0'..='7')
+        {
+            num_str.push(c3);
+            self.col_num += 1;
+            self.chars.next();
+        }
+        match i64::from_str_radix(&num_str, 8) {
+            Ok(i) => {
+                self.tokens.push(Token::Octal(i));
+            }
+            Err(e) => {
+                return Err(LexingError::InvalidNumber {
+                    point: Point {
+                        line: self.line_num,
+                        column: self.col_num,
+                    },
+                    num_str,
+                    parse_err: e.to_string(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn lex_number_with_leading_0_but_2nd_char_is_digit(&mut self) -> Result<(), LexingError> {
+        let mut num_str = String::new();
+        let mut is_octal = true;
+        while let Some(&(_, c3)) = self.chars.peek()
+            && c3.is_ascii_digit()
+        {
+            num_str.push(c3);
+            self.col_num += 1;
+            self.chars.next();
+            is_octal = is_octal && matches!(c3, '0'..='7');
+        }
+        if is_octal {
+            match i64::from_str_radix(&num_str, 8) {
+                Ok(i) => {
+                    self.tokens.push(Token::Octal(i));
+                }
+                Err(e) => {
+                    return Err(LexingError::InvalidNumber {
+                        point: Point {
+                            line: self.line_num,
+                            column: self.col_num,
+                        },
+                        num_str,
+                        parse_err: e.to_string(),
+                    });
+                }
+            }
+        } else {
+            match num_str.parse::<f64>() {
+                Ok(f) => {
+                    self.tokens.push(Token::Decimal(f.into()));
+                }
+                Err(e) => {
+                    return Err(LexingError::InvalidNumber {
+                        point: Point {
+                            line: self.line_num,
+                            column: self.col_num,
+                        },
+                        num_str,
+                        parse_err: e.to_string(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn lex_number_starting_with_1_to_9(&mut self, i: usize, c: char) -> Result<(), LexingError> {
+        let start = i;
+        let mut end = i;
+        let mut num_str = String::from(c);
+        let mut exponent = String::new();
+        let mut has_exp = false;
+        let mut has_decimal_point = false;
+        self.col_num += 1;
+        self.chars.next();
+        while let Some(&(_, c2)) = self.chars.peek() {
+            match c2 {
+                '_' => {
+                    end += 1;
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+                '0'..='9' => {
+                    if has_exp {
+                        exponent.push(c2);
+                    } else {
+                        num_str.push(c2);
+                    }
+                    end += 1;
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+                'e' | 'E' => {
+                    if has_exp {
+                        break;
+                    }
+                    has_exp = true;
+                    end += 1;
+                    self.col_num += 1;
+                    self.chars.next();
+                    if let Some(&(_, c3)) = self.chars.peek()
+                        && !matches!(c3, '-' | '0'..='9')
+                    {
+                        break;
+                    }
+                }
+                '-' => {
+                    if !has_exp || !exponent.is_empty() {
+                        break;
+                    }
+                    exponent.push('-');
+                    end += 1;
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+                '.' => {
+                    if has_decimal_point || has_exp {
+                        break;
+                    }
+                    has_decimal_point = true;
+                    end += 1;
+                    num_str.push('.');
+                    self.col_num += 1;
+                    self.chars.next();
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+
+        match num_str.parse::<f64>() {
+            Ok(f) => {
+                if has_exp {
+                    match exponent.parse::<i64>() {
+                        Ok(i) => {
+                            self.tokens.push(Token::Exponential {
+                                base: f.into(),
+                                exp: i,
+                            });
+                        }
+                        Err(e) => {
+                            return Err(LexingError::invalid_number(
+                                Point::new(self.line_num, self.col_num),
+                                self.input[start..end].to_string(),
+                                e.to_string(),
+                            ));
+                        }
+                    }
+                } else {
+                    self.tokens.push(Token::Decimal((f).into()));
+                }
+            }
+            Err(e) => {
+                return Err(LexingError::invalid_number(
+                    Point::new(self.line_num, self.col_num),
+                    self.input[start..end].to_string(),
+                    e.to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn lex(input: &str) -> Result<Vec<Token<'_>>, LexingError> {
+    Lexer::new(input).lex()
 }
 
 #[cfg(test)]
