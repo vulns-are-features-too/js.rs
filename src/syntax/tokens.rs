@@ -1,3 +1,5 @@
+use eq_float::F64;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token<'a> {
     Identifier(&'a str),
@@ -6,8 +8,8 @@ pub enum Token<'a> {
     Null,
     True,
     False,
-    Decimal(f64),
-    Exponential { base: f64, exp: i64 }, // beN/bEN where b=base, N=exponent
+    Decimal(F64),
+    Exponential { base: F64, exp: i64 }, // beN/bEN where b=base, N=exponent
     Binary(i64),                         // starts with 0b/0B
     Octal(i64),                          // starts with 0/0o/0O
     Hexadecimal(i64),                    // starts with 0x/0X
