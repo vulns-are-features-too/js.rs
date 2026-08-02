@@ -236,11 +236,11 @@ where
     {
         match i64::from_str_radix(&num_str, radix) {
             Ok(i) => Ok(token_fn(i)),
-            Err(e) => Err(LexingError::InvalidNumber {
-                point: self.curr_point(),
+            Err(e) => Err(LexingError::invalid_number(
+                self.curr_point(),
                 num_str,
-                parse_err: e.to_string(),
-            }),
+                e.to_string(),
+            )),
         }
     }
 
@@ -290,11 +290,11 @@ where
                     self.tokens.push(Token::Decimal(f.into()));
                 }
                 Err(e) => {
-                    return Err(LexingError::InvalidNumber {
-                        point: self.curr_point(),
+                    return Err(LexingError::invalid_number(
+                        self.curr_point(),
                         num_str,
-                        parse_err: e.to_string(),
-                    });
+                        e.to_string(),
+                    ));
                 }
             }
         }
