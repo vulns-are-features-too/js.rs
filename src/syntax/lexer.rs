@@ -195,7 +195,64 @@ where
             self.col_num += 1;
             self.chars.next();
         }
-        self.tokens.push(Token::Identifier(&self.input[start..end]));
+        let s = &self.input[start..end];
+        self.tokens.push(match s {
+            "null" => Token::Null,
+            "true" => Token::True,
+            "false" => Token::False,
+            "break" => Token::Break,
+            "case" => Token::Case,
+            "catch" => Token::Catch,
+            "class" => Token::Class,
+            "const" => Token::Const,
+            "continue" => Token::Continue,
+            "debugger" => Token::Debugger,
+            "default" => Token::Default,
+            "delete" => Token::Delete,
+            "do" => Token::Do,
+            "else" => Token::Else,
+            "export" => Token::Export,
+            "extends" => Token::Extends,
+            "finally" => Token::Finally,
+            "for" => Token::For,
+            "function" => Token::Function,
+            "if" => Token::If,
+            "import" => Token::Import,
+            "in" => Token::In,
+            "instanceof" => Token::Instanceof,
+            "new" => Token::New,
+            "return" => Token::Return,
+            "super" => Token::Super,
+            "switch" => Token::Switch,
+            "this" => Token::This,
+            "throw" => Token::Throw,
+            "try" => Token::Try,
+            "typeof" => Token::Typeof,
+            "var" => Token::Var,
+            "void" => Token::Void,
+            "while" => Token::While,
+            "with" => Token::With,
+            "let" => Token::Let,
+            "static" => Token::Static,
+            "yield" => Token::Yield,
+            "await" => Token::Await,
+            "async" => Token::Async,
+            "arguments" => Token::Arguments,
+            "as" => Token::As,
+            "eval" => Token::Eval,
+            "from" => Token::From,
+            "get" => Token::Get,
+            "of" => Token::Of,
+            "set" => Token::Set,
+            "enum" => Token::Enum,
+            "implements" => Token::Implements,
+            "interface" => Token::Interface,
+            "package" => Token::Package,
+            "private" => Token::Private,
+            "protected" => Token::Protected,
+            "public" => Token::Public,
+            _ => Token::Identifier(s),
+        });
     }
 
     #[inline]
@@ -521,6 +578,61 @@ mod tests {
     #[case("08n", Token::BigInt("08n"))]
     #[case("077n", Token::BigInt("077n"))]
     #[case("088n", Token::BigInt("088n"))]
+    // keywords
+    #[case("null", Token::Null)]
+    #[case("true", Token::True)]
+    #[case("false", Token::False)]
+    #[case("break", Token::Break)]
+    #[case("case", Token::Case)]
+    #[case("catch", Token::Catch)]
+    #[case("class", Token::Class)]
+    #[case("const", Token::Const)]
+    #[case("continue", Token::Continue)]
+    #[case("debugger", Token::Debugger)]
+    #[case("default", Token::Default)]
+    #[case("delete", Token::Delete)]
+    #[case("do", Token::Do)]
+    #[case("else", Token::Else)]
+    #[case("export", Token::Export)]
+    #[case("extends", Token::Extends)]
+    #[case("finally", Token::Finally)]
+    #[case("for", Token::For)]
+    #[case("function", Token::Function)]
+    #[case("if", Token::If)]
+    #[case("import", Token::Import)]
+    #[case("in", Token::In)]
+    #[case("instanceof", Token::Instanceof)]
+    #[case("new", Token::New)]
+    #[case("return", Token::Return)]
+    #[case("super", Token::Super)]
+    #[case("switch", Token::Switch)]
+    #[case("this", Token::This)]
+    #[case("throw", Token::Throw)]
+    #[case("try", Token::Try)]
+    #[case("typeof", Token::Typeof)]
+    #[case("var", Token::Var)]
+    #[case("void", Token::Void)]
+    #[case("while", Token::While)]
+    #[case("with", Token::With)]
+    #[case("let", Token::Let)]
+    #[case("static", Token::Static)]
+    #[case("yield", Token::Yield)]
+    #[case("await", Token::Await)]
+    #[case("async", Token::Async)]
+    #[case("arguments", Token::Arguments)]
+    #[case("as", Token::As)]
+    #[case("eval", Token::Eval)]
+    #[case("from", Token::From)]
+    #[case("get", Token::Get)]
+    #[case("of", Token::Of)]
+    #[case("set", Token::Set)]
+    #[case("enum", Token::Enum)]
+    #[case("implements", Token::Implements)]
+    #[case("interface", Token::Interface)]
+    #[case("package", Token::Package)]
+    #[case("private", Token::Private)]
+    #[case("protected", Token::Protected)]
+    #[case("public", Token::Public)]
     fn single_token(#[case] s: &str, #[case] expected: Token) {
         let tokens = lex(s).expect("failed to lex");
         assert_eq!(expected, tokens[0]);
@@ -609,6 +721,7 @@ mod tests {
     #[case("a b c", vec![Token::Identifier("a"), Token::WhiteSpace, Token::Identifier("b"), Token::WhiteSpace, Token::Identifier("c"), Token::Eof])]
     #[case("a1 b9 c0", vec![Token::Identifier("a1"), Token::WhiteSpace, Token::Identifier("b9"), Token::WhiteSpace, Token::Identifier("c0"), Token::Eof])]
     #[case("_X _y _Z", vec![Token::Identifier("_X"), Token::WhiteSpace, Token::Identifier("_y"), Token::WhiteSpace, Token::Identifier("_Z"), Token::Eof])]
+    #[case("public class Foo", vec![Token::Public, Token::WhiteSpace, Token::Class, Token::WhiteSpace, Token::Identifier("Foo"), Token::Eof])]
     fn identifiers(#[case] s: &str, #[case] expected: Vec<Token>) {
         let tokens = lex(s).expect("failed to lex");
         assert_eq!(expected, tokens);
@@ -622,6 +735,7 @@ mod tests {
     #[case("0o1 0777 0O0", vec![3, 4, 8, 9, 12])]
     #[case("0 0xF 0b1 0o7 077 9", vec![1, 2, 5, 6, 9, 10, 13, 14, 17, 18, 19])]
     #[case("0n 0xFn 0b1n 0o7n 077n 9n", vec![2, 3, 7, 8, 12, 13, 17, 18, 22, 23, 25])]
+    #[case("public class Foo {}", vec![6, 7, 12, 13, 16, 17, 18, 19])]
     fn columns_numbers(#[case] s: &str, #[case] expected: Vec<usize>) {
         let mut lexer = Lexer::new(s);
         for col in expected {
