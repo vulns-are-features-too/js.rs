@@ -14,11 +14,11 @@ pub enum LexingError {
 }
 
 impl LexingError {
-    fn invalid_char(point: Point, c: char) -> Self {
+    const fn invalid_char(point: Point, c: char) -> Self {
         Self::InvalidChar { point, c }
     }
 
-    fn invalid_number(point: Point, num_str: String, parse_err: String) -> Self {
+    const fn invalid_number(point: Point, num_str: String, parse_err: String) -> Self {
         Self::InvalidNumber {
             point,
             num_str,
@@ -255,7 +255,7 @@ pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError> {
                     }
                 } else {
                     tokens.push(Token::Decimal(0.0.into()));
-                };
+                }
             }
 
             '1'..='9' => {
@@ -279,7 +279,7 @@ pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError> {
                                 exponent.push(c2);
                             } else {
                                 num_str.push(c2);
-                            };
+                            }
                             end += 1;
                             col_num += 1;
                             chars.next();
@@ -358,7 +358,7 @@ pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError> {
             _ => {
                 return Err(LexingError::invalid_char(Point::new(line_num, col_num), *c));
             }
-        };
+        }
     }
 
     tokens.push(Token::Eof);

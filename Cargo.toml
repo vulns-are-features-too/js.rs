@@ -2,6 +2,20 @@
 name = "js"
 version = "0.1.0"
 edition = "2024"
+description = "JavaScript implemented in Rust"
+keywords = [
+    "interpreter",
+    "javascript",
+    "runtime",
+]
+categories = [
+    "development-tools",
+    "parser-implementations",
+    "parsing",
+]
+repository = "https://github.com/vulns-are-features-too/js.rs"
+license = "MIT"
+readme = "README.md"
 
 [dependencies]
 eq-float = "0.1.0"
@@ -10,9 +24,9 @@ eq-float = "0.1.0"
 rstest = "0.26.1"
 
 [lints.clippy]
-# cargo = "warn"
-# nursery = "warn"
-# pedantic = "warn"
+cargo = "warn"
+nursery = "warn"
+pedantic = "warn"
 
 [lints.rust]
 future-incompatible = "deny"

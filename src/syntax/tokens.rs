@@ -1,6 +1,6 @@
 use eq_float::F64;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Token<'a> {
     Identifier(&'a str),
 
