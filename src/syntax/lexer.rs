@@ -232,7 +232,7 @@ where
         token_fn: T,
     ) -> Result<Token<'o>, LexingError>
     where
-        T: Fn(i64) -> Token<'i>,
+        T: Fn(i64) -> Token<'o>,
     {
         i64::from_str_radix(&num_str, radix)
             .map(token_fn)
@@ -247,7 +247,7 @@ where
     ) -> Result<(), LexingError>
     where
         M: Fn(char) -> bool,
-        T: Fn(i64) -> Token<'i>,
+        T: Fn(i64) -> Token<'o>,
     {
         let mut num_str = String::new();
         self.col_num += 1;
