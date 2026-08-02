@@ -21,7 +21,7 @@ pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError>
     let mut col_num = 0;
     let mut tokens = vec![];
 
-    while let Some((_, c)) = chars.peek() {
+    while let Some((i, c)) = chars.peek() {
         match c {
             // whitespace
             ' ' | '\t' => {
@@ -94,6 +94,21 @@ pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError>
                 col_num += 1;
                 chars.next();
             }
+
+            // identifier or keyword
+            'a'..='z' | 'A'..='Z' | '_' => {
+                let start = *i;
+                let mut end = start;
+                while let Some(&(_, c2)) = chars.peek()
+                    && (c2.is_alphanumeric() || c2 == '_')
+                {
+                    end += 1;
+                    col_num += 1;
+                    chars.next();
+                }
+                tokens.push(Token::Identifier(&s[start..end]));
+            }
+
             _ => {
                 return Err(LexingError::invalid_char(Point::new(line_num, col_num), *c));
             }
@@ -128,6 +143,16 @@ mod tests {
     #[case(" ", Token::WhiteSpace)]
     #[case("\t", Token::WhiteSpace)]
     #[case(" \t ", Token::WhiteSpace)]
+    // identifiers
+    #[case("x", Token::Identifier("x"))]
+    #[case("x2", Token::Identifier("x2"))]
+    #[case("myvar", Token::Identifier("myvar"))]
+    #[case("myvar2", Token::Identifier("myvar2"))]
+    #[case("a1b2c3", Token::Identifier("a1b2c3"))]
+    #[case("my_var", Token::Identifier("my_var"))]
+    #[case("my_other_var", Token::Identifier("my_other_var"))]
+    #[case("_x", Token::Identifier("_x"))]
+    #[case("_1", Token::Identifier("_1"))]
     fn single_token(#[case] s: &str, #[case] expected: Token) {
         let tokens = lex(s).expect("failed to lex");
         assert_eq!(expected, tokens[0]);
@@ -191,5 +216,14 @@ mod tests {
             .filter(|x| matches!(x, Token::WhiteSpace))
             .count();
         assert_eq!(expected, count);
+    }
+
+    #[rstest]
+    #[case("a b c", vec![Token::Identifier("a"), Token::WhiteSpace, Token::Identifier("b"), Token::WhiteSpace, Token::Identifier("c"), Token::Eof])]
+    #[case("a1 b9 c0", vec![Token::Identifier("a1"), Token::WhiteSpace, Token::Identifier("b9"), Token::WhiteSpace, Token::Identifier("c0"), Token::Eof])]
+    #[case("_X _y _Z", vec![Token::Identifier("_X"), Token::WhiteSpace, Token::Identifier("_y"), Token::WhiteSpace, Token::Identifier("_Z"), Token::Eof])]
+    fn identifiers(#[case] s: &str, #[case] expected: Vec<Token>) {
+        let tokens = lex(s).expect("failed to lex");
+        assert_eq!(expected, tokens);
     }
 }
