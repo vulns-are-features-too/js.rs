@@ -221,6 +221,28 @@ where
         Ok(())
     }
 
+    fn try_parse_int_token<T>(
+        &self,
+        num_str: String,
+        radix: u32,
+        token_fn: T,
+    ) -> Result<Token<'o>, LexingError>
+    where
+        T: Fn(i64) -> Token<'i>,
+    {
+        match i64::from_str_radix(&num_str, radix) {
+            Ok(i) => Ok(token_fn(i)),
+            Err(e) => Err(LexingError::InvalidNumber {
+                point: Point {
+                    line: self.line_num,
+                    column: self.col_num,
+                },
+                num_str,
+                parse_err: e.to_string(),
+            }),
+        }
+    }
+
     fn lex_number_with_alt_base<M, T>(
         &mut self,
         radix: u32,
@@ -241,20 +263,9 @@ where
             self.col_num += 1;
             self.chars.next();
         }
-        match i64::from_str_radix(&num_str, radix) {
-            Ok(i) => {
-                self.tokens.push(token_fn(i));
-                Ok(())
-            }
-            Err(e) => Err(LexingError::InvalidNumber {
-                point: Point {
-                    line: self.line_num,
-                    column: self.col_num,
-                },
-                num_str,
-                parse_err: e.to_string(),
-            }),
-        }
+        let token = self.try_parse_int_token(num_str, radix, token_fn)?;
+        self.tokens.push(token);
+        Ok(())
     }
 
     #[inline]
@@ -270,21 +281,8 @@ where
             is_octal = is_octal && matches!(c3, '0'..='7');
         }
         if is_octal {
-            match i64::from_str_radix(&num_str, 8) {
-                Ok(i) => {
-                    self.tokens.push(Token::Octal(i));
-                }
-                Err(e) => {
-                    return Err(LexingError::InvalidNumber {
-                        point: Point {
-                            line: self.line_num,
-                            column: self.col_num,
-                        },
-                        num_str,
-                        parse_err: e.to_string(),
-                    });
-                }
-            }
+            let token = self.try_parse_int_token(num_str, 8, Token::Octal)?;
+            self.tokens.push(token);
         } else {
             match num_str.parse::<f64>() {
                 Ok(f) => {
