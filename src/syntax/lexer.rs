@@ -234,14 +234,9 @@ where
     where
         T: Fn(i64) -> Token<'i>,
     {
-        match i64::from_str_radix(&num_str, radix) {
-            Ok(i) => Ok(token_fn(i)),
-            Err(e) => Err(LexingError::invalid_number(
-                self.curr_point(),
-                num_str,
-                e.to_string(),
-            )),
-        }
+        i64::from_str_radix(&num_str, radix)
+            .map(token_fn)
+            .map_err(|e| LexingError::invalid_number(self.curr_point(), num_str, e.to_string()))
     }
 
     fn lex_number_with_alt_base<M, T>(
