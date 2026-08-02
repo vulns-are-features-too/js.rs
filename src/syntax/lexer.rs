@@ -1,4 +1,4 @@
-use crate::syntax::{locations::Point,tokens::Token};
+use crate::syntax::{locations::Point, tokens::Token};
 
 #[derive(Debug)]
 pub enum LexingError {
@@ -27,8 +27,7 @@ impl LexingError {
     }
 }
 
-pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError>
-{
+pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError> {
     let mut chars = s.chars().enumerate().peekable();
     let mut line_num = 0;
     let mut col_num = 0;
@@ -181,7 +180,8 @@ pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError>
                                 }
                             }
                         }
-                        'o' | 'O' => { // TODO: handle no o & 8/9
+                        'o' | 'O' => {
+                            // TODO: handle no o & 8/9
                             col_num += 1;
                             chars.next();
                             while let Some(&(_, c3)) = chars.peek()
@@ -204,6 +204,50 @@ pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError>
                                         num_str,
                                         parse_err: e.to_string(),
                                     });
+                                }
+                            }
+                        }
+                        '0'..='9' => {
+                            let mut is_octal = true;
+                            while let Some(&(_, c3)) = chars.peek()
+                                && c3.is_ascii_digit()
+                            {
+                                num_str.push(c3);
+                                col_num += 1;
+                                chars.next();
+                                is_octal = is_octal && matches!(c3, '0'..='7');
+                            }
+                            if is_octal {
+                                match i64::from_str_radix(&num_str, 8) {
+                                    Ok(i) => {
+                                        tokens.push(Token::Octal(i));
+                                    }
+                                    Err(e) => {
+                                        return Err(LexingError::InvalidNumber {
+                                            point: Point {
+                                                line: line_num,
+                                                column: col_num,
+                                            },
+                                            num_str,
+                                            parse_err: e.to_string(),
+                                        });
+                                    }
+                                }
+                            } else {
+                                match num_str.parse::<f64>() {
+                                    Ok(f) => {
+                                        tokens.push(Token::Decimal(f.into()));
+                                    }
+                                    Err(e) => {
+                                        return Err(LexingError::InvalidNumber {
+                                            point: Point {
+                                                line: line_num,
+                                                column: col_num,
+                                            },
+                                            num_str,
+                                            parse_err: e.to_string(),
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -384,8 +428,12 @@ mod tests {
     #[case("0b000", Token::Binary(0b0))]
     #[case("0o77", Token::Octal(0o77))]
     #[case("0O77", Token::Octal(0o77))]
+    #[case("077", Token::Octal(0o77))]
     #[case("0o0", Token::Octal(0o0))]
     #[case("0o1", Token::Octal(0o1))]
+    #[case("08", Token::Decimal(8.0.into()))]
+    #[case("09", Token::Decimal(9.0.into()))]
+    #[case("0989", Token::Decimal(989.0.into()))]
     fn single_token(#[case] s: &str, #[case] expected: Token) {
         let tokens = lex(s).expect("failed to lex");
         assert_eq!(expected, tokens[0]);
@@ -459,7 +507,7 @@ mod tests {
     #[case("0x1 0X2 0x3", vec![Token::Hexadecimal(1), Token::WhiteSpace, Token::Hexadecimal(2), Token::WhiteSpace, Token::Hexadecimal(3), Token::Eof])]
     #[case("0xAb 0XcD 0xEF", vec![Token::Hexadecimal(0xAB), Token::WhiteSpace, Token::Hexadecimal(0xCD), Token::WhiteSpace, Token::Hexadecimal(0xEF), Token::Eof])]
     #[case("0b111 0B1010 0b000", vec![Token::Binary(0b111), Token::WhiteSpace, Token::Binary(0b1010), Token::WhiteSpace, Token::Binary(0b0), Token::Eof])]
-    #[case("0o123 0o77 0O70", vec![Token::Octal(0o123), Token::WhiteSpace, Token::Octal(0o77), Token::WhiteSpace, Token::Octal(0o70), Token::Eof])]
+    #[case("0o123 077 090 0O70", vec![Token::Octal(0o123), Token::WhiteSpace, Token::Octal(0o77), Token::WhiteSpace, Token::Decimal(90.0.into()), Token::WhiteSpace, Token::Octal(0o70), Token::Eof])]
     fn numbers(#[case] s: &str, #[case] expected: Vec<Token>) {
         let tokens = lex(s).expect("failed to lex");
         assert_eq!(expected, tokens);
