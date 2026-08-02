@@ -6,11 +6,24 @@ pub enum LexingError {
         point: Point,
         c: char,
     },
+    InvalidNumber {
+        point: Point,
+        num_str: String,
+        parse_err: String,
+    },
 }
 
 impl LexingError {
     fn invalid_char(point: Point, c: char) -> Self {
         Self::InvalidChar { point, c }
+    }
+
+    fn invalid_number(point: Point, num_str: String, parse_err: String) -> Self {
+        Self::InvalidNumber {
+            point,
+            num_str,
+            parse_err,
+        }
     }
 }
 
@@ -109,6 +122,143 @@ pub fn lex(s: &str) -> Result<Vec<Token<'_>>, LexingError>
                 tokens.push(Token::Identifier(&s[start..end]));
             }
 
+            // numbers
+            '0' => {
+                col_num += 1;
+                chars.next();
+                if let Some((_, c2)) = chars.peek() {
+                    let mut num_str = String::new();
+                    match c2 {
+                        'x' | 'X' => {
+                            col_num += 1;
+                            chars.next();
+                            while let Some(&(_, c3)) = chars.peek()
+                                && c3.is_ascii_hexdigit()
+                            {
+                                num_str.push(c3);
+                                col_num += 1;
+                                chars.next();
+                            }
+                            match i64::from_str_radix(&num_str, 16) {
+                                Ok(i) => {
+                                    tokens.push(Token::Hexadecimal(i));
+                                }
+                                Err(e) => {
+                                    return Err(LexingError::InvalidNumber {
+                                        point: Point {
+                                            line: line_num,
+                                            column: col_num,
+                                        },
+                                        num_str,
+                                        parse_err: e.to_string(),
+                                    });
+                                }
+                            }
+                        }
+                        _ => tokens.push(Token::Decimal(0.0.into())),
+                    }
+                } else {
+                    tokens.push(Token::Decimal(0.0.into()));
+                };
+            }
+
+            '1'..='9' => {
+                let start = *i;
+                let mut end = *i;
+                let mut num_str = String::from(*c);
+                let mut exponent = String::new();
+                let mut has_exp = false;
+                let mut has_decimal_point = false;
+                col_num += 1;
+                chars.next();
+                while let Some(&(_, c2)) = chars.peek() {
+                    match c2 {
+                        '_' => {
+                            end += 1;
+                            col_num += 1;
+                            chars.next();
+                        }
+                        '0'..='9' => {
+                            if has_exp {
+                                exponent.push(c2);
+                            } else {
+                                num_str.push(c2);
+                            };
+                            end += 1;
+                            col_num += 1;
+                            chars.next();
+                        }
+                        'e' | 'E' => {
+                            if has_exp {
+                                break;
+                            }
+                            has_exp = true;
+                            end += 1;
+                            col_num += 1;
+                            chars.next();
+                            if let Some(&(_, c3)) = chars.peek()
+                                && !matches!(c3, '-' | '0'..='9')
+                            {
+                                break;
+                            }
+                        }
+                        '-' => {
+                            if !has_exp || !exponent.is_empty() {
+                                break;
+                            }
+                            exponent.push('-');
+                            end += 1;
+                            col_num += 1;
+                            chars.next();
+                        }
+                        '.' => {
+                            if has_decimal_point || has_exp {
+                                break;
+                            }
+                            has_decimal_point = true;
+                            end += 1;
+                            num_str.push('.');
+                            col_num += 1;
+                            chars.next();
+                        }
+                        _ => {
+                            break;
+                        }
+                    }
+                }
+
+                match num_str.parse::<f64>() {
+                    Ok(f) => {
+                        if has_exp {
+                            match exponent.parse::<i64>() {
+                                Ok(i) => {
+                                    tokens.push(Token::Exponential {
+                                        base: f.into(),
+                                        exp: i,
+                                    });
+                                }
+                                Err(e) => {
+                                    return Err(LexingError::invalid_number(
+                                        Point::new(line_num, col_num),
+                                        s[start..end].to_string(),
+                                        e.to_string(),
+                                    ));
+                                }
+                            }
+                        } else {
+                            tokens.push(Token::Decimal((f).into()));
+                        }
+                    }
+                    Err(e) => {
+                        return Err(LexingError::invalid_number(
+                            Point::new(line_num, col_num),
+                            s[start..end].to_string(),
+                            e.to_string(),
+                        ));
+                    }
+                }
+            }
+
             _ => {
                 return Err(LexingError::invalid_char(Point::new(line_num, col_num), *c));
             }
@@ -153,6 +303,29 @@ mod tests {
     #[case("my_other_var", Token::Identifier("my_other_var"))]
     #[case("_x", Token::Identifier("_x"))]
     #[case("_1", Token::Identifier("_1"))]
+    // numbers
+    #[case("0", Token::Decimal(0.0.into()))]
+    #[case("1", Token::Decimal(1.0.into()))]
+    #[case("9", Token::Decimal(9.0.into()))]
+    #[case("1_2", Token::Decimal(12.0.into()))]
+    #[case("9_9", Token::Decimal(99.0.into()))]
+    #[case("1_23_4", Token::Decimal(1234.0.into()))]
+    #[case("1.2", Token::Decimal(1.2.into()))]
+    #[case("9.9", Token::Decimal(9.9.into()))]
+    #[case("1_2.3_4", Token::Decimal(12.34.into()))]
+    #[case("2e3", Token::Exponential{base: 2.0.into(), exp: 3})]
+    #[case("1_2e3_4", Token::Exponential{base: 12.0.into(), exp: 34})]
+    #[case("1.2e3", Token::Exponential{base: 1.2.into(), exp: 3})]
+    #[case("1.2e-3", Token::Exponential{base: 1.2.into(), exp: -3})]
+    #[case("1_2.3_4e-5_6", Token::Exponential{base: 12.34.into(), exp: -56})]
+    #[case("9_9.9_9e9_9", Token::Exponential{base: 99.99.into(), exp: 99})]
+    #[case("9_9.9_9e-9_9", Token::Exponential{base: 99.99.into(), exp: -99})]
+    #[case("0X0", Token::Hexadecimal(0))]
+    #[case("0x0", Token::Hexadecimal(0))]
+    #[case("0x1", Token::Hexadecimal(1))]
+    #[case("0x123456789", Token::Hexadecimal(0x123456789))]
+    #[case("0xABCDEF0", Token::Hexadecimal(0xABCDEF0))]
+    #[case("0xabcdef0", Token::Hexadecimal(0xABCDEF0))]
     fn single_token(#[case] s: &str, #[case] expected: Token) {
         let tokens = lex(s).expect("failed to lex");
         assert_eq!(expected, tokens[0]);
@@ -216,6 +389,18 @@ mod tests {
             .filter(|x| matches!(x, Token::WhiteSpace))
             .count();
         assert_eq!(expected, count);
+    }
+
+    #[rstest]
+    #[case("0 0 0", vec![Token::Decimal(0.0.into()), Token::WhiteSpace, Token::Decimal(0.0.into()), Token::WhiteSpace, Token::Decimal(0.0.into()), Token::Eof])]
+    #[case("1 2 3", vec![Token::Decimal(1.0.into()), Token::WhiteSpace, Token::Decimal(2.0.into()), Token::WhiteSpace, Token::Decimal(3.0.into()), Token::Eof])]
+    #[case("19 28 37", vec![Token::Decimal(19.0.into()), Token::WhiteSpace, Token::Decimal(28.0.into()), Token::WhiteSpace, Token::Decimal(37.0.into()), Token::Eof])]
+    #[case("0x0 0x0 0x0", vec![Token::Hexadecimal(0), Token::WhiteSpace, Token::Hexadecimal(0), Token::WhiteSpace, Token::Hexadecimal(0), Token::Eof])]
+    #[case("0x1 0X2 0x3", vec![Token::Hexadecimal(1), Token::WhiteSpace, Token::Hexadecimal(2), Token::WhiteSpace, Token::Hexadecimal(3), Token::Eof])]
+    #[case("0xAb 0XcD 0xEF", vec![Token::Hexadecimal(0xAB), Token::WhiteSpace, Token::Hexadecimal(0xCD), Token::WhiteSpace, Token::Hexadecimal(0xEF), Token::Eof])]
+    fn numbers(#[case] s: &str, #[case] expected: Vec<Token>) {
+        let tokens = lex(s).expect("failed to lex");
+        assert_eq!(expected, tokens);
     }
 
     #[rstest]
