@@ -57,8 +57,8 @@ where
         }
     }
 
-    fn lex(mut self) -> Result<Vec<Token<'o>>, LexingError> {
-        while let Some(&(i, c)) = self.chars.peek() {
+    fn lex_one(&mut self) -> Result<bool, LexingError> {
+        if let Some(&(i, c)) = self.chars.peek() {
             match c {
                 // whitespace
                 ' ' | '\t' => {
@@ -134,9 +134,15 @@ where
                     ));
                 }
             }
+            return Ok(true);
         }
 
         self.tokens.push(Token::Eof);
+        Ok(false)
+    }
+
+    fn lex(mut self) -> Result<Vec<Token<'o>>, LexingError> {
+        while self.lex_one()? {}
         Ok(self.tokens)
     }
 
@@ -605,183 +611,20 @@ mod tests {
         assert_eq!(expected, tokens);
     }
 
-    #[test]
-    fn column_number_identifier_and_keyword() {
-        let mut lexer = Lexer::new("int ABCD yz");
-
-        lexer.lex_identifier_or_keyword(0);
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(3, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(4, lexer.col_num);
-
-        lexer.lex_identifier_or_keyword(4);
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(8, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(9, lexer.col_num);
-
-        lexer.lex_identifier_or_keyword(9);
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(11, lexer.col_num);
-    }
-
-    #[test]
-    fn column_number_dec_nums() {
-        let mut lexer = Lexer::new("12 345 67890");
-
-        assert!(lexer.lex_number_starting_with_1_to_9(0, '1').is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(2, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(3, lexer.col_num);
-
-        assert!(lexer.lex_number_starting_with_1_to_9(4, '3').is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(6, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(7, lexer.col_num);
-
-        assert!(lexer.lex_number_starting_with_1_to_9(7, '6').is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(12, lexer.col_num);
-    }
-
-    #[test]
-    fn column_number_hex_nums() {
-        let mut lexer = Lexer::new("0x12 0X9A 0xDeF");
-
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(4, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(5, lexer.col_num);
-
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(9, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(10, lexer.col_num);
-
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(15, lexer.col_num);
-    }
-
-    #[test]
-    fn column_number_bin_nums() {
-        let mut lexer = Lexer::new("0b0 0b101 0B1");
-
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(3, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(4, lexer.col_num);
-
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(9, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(10, lexer.col_num);
-
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(13, lexer.col_num);
-    }
-
-    #[test]
-    fn column_number_oct_nums() {
-        let mut lexer = Lexer::new("0o1 0777 0O0");
-
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(3, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(4, lexer.col_num);
-
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(8, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(9, lexer.col_num);
-
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(12, lexer.col_num);
-    }
-
-    #[test]
-    fn column_number_mixed_nums() {
-        let mut lexer = Lexer::new("0 0xF 0b1 0o7 077 9");
-
-        // 0
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(1, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(2, lexer.col_num);
-
-        // 0xF
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(5, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(6, lexer.col_num);
-
-        // 0b1
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(9, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(10, lexer.col_num);
-
-        // 0o7
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(13, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(14, lexer.col_num);
-
-        // 077
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(17, lexer.col_num);
-
-        lexer.lex_whitespace();
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(18, lexer.col_num);
-
-        // 9
-        assert!(lexer.lex_number_starting_with_0().is_ok());
-        assert_eq!(0, lexer.line_num);
-        assert_eq!(19, lexer.col_num);
+    #[rstest]
+    #[case("int ABCD yz", vec![3, 4, 8, 9, 11])]
+    #[case("12 345 67890", vec![2, 3, 6, 7, 12])]
+    #[case("0x12 0X9A 0xDeF", vec![4, 5, 9, 10, 15])]
+    #[case("0b0 0b101 0B1", vec![3, 4, 9, 10, 13])]
+    #[case("0o1 0777 0O0", vec![3, 4, 8, 9, 12])]
+    #[case("0 0xF 0b1 0o7 077 9", vec![1, 2, 5, 6, 9, 10, 13, 14, 17, 18, 19])]
+    fn columns_numbers(#[case] s: &str, #[case] expected: Vec<usize>) {
+        let mut lexer = Lexer::new(s);
+        for col in expected {
+            assert!(lexer.lex_one().unwrap());
+            assert_eq!(0, lexer.line_num);
+            assert_eq!(col, lexer.col_num);
+        }
+        assert!(!lexer.lex_one().unwrap());
     }
 }
