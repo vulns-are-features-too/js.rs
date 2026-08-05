@@ -3,7 +3,7 @@ use std::{
     str::Chars,
 };
 
-use crate::syntax::{locations::Point, tokens::Token};
+use crate::syntax::{lexing::tokens::Token, locations::Point};
 
 #[derive(Debug)]
 pub enum LexingError {

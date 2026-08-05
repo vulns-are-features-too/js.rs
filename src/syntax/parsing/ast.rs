@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use crate::syntax::{
-    lexer::{LexingError, lex},
-    parser::{ParsingError, parse},
+    lexing::lexer::{LexingError, lex},
+    parsing::parser::{ParsingError, parse},
 };
 
 #[derive(Debug)]

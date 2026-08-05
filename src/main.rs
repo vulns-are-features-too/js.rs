@@ -1,6 +1,6 @@
 mod syntax;
 
-use crate::syntax::ast;
+use crate::syntax::parsing::ast;
 use std::str::FromStr;
 
 fn main() {
