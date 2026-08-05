@@ -18,7 +18,7 @@ impl FromStr for Ast {
     type Err = SyntaxError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let tokens = lex(s).map_err(SyntaxError::Lexing)?;
+        let tokens = lex(s);
         parse(tokens).map_err(SyntaxError::Parsing)
     }
 }

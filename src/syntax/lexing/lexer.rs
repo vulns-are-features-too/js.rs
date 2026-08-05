@@ -1,9 +1,19 @@
 use std::{
     iter::{Enumerate, Peekable},
+    marker::PhantomData,
     str::Chars,
 };
 
-use crate::syntax::{lexing::tokens::Token, locations::Point};
+use crate::syntax::{
+    lexing::{
+        keyword_or_identifier::KeyworkOrIdentifier,
+        newline::{CR, LF},
+        number::Number,
+        tokens::Token,
+        whitespace::WhiteSpace,
+    },
+    locations::Point,
+};
 
 #[derive(Debug)]
 pub enum LexingError {
@@ -32,18 +42,39 @@ impl LexingError {
     }
 }
 
-struct Lexer<'i, 'o>
+pub trait LexerState {}
+
+pub struct Base;
+
+impl LexerState for Base {}
+
+pub struct Lexer<'i, State>
 where
-    'i: 'o,
+    State: LexerState,
 {
-    input: &'i str,
-    chars: Peekable<Enumerate<Chars<'i>>>,
-    line_num: usize,
-    col_num: usize,
-    tokens: Vec<Token<'o>>,
+    pub input: &'i str,
+    pub chars: Peekable<Enumerate<Chars<'i>>>,
+    pub line_num: usize,
+    pub col_num: usize,
+    _s: PhantomData<State>,
 }
 
-impl<'i, 'o> Lexer<'i, 'o>
+impl<'i, State> Lexer<'i, State>
+where
+    State: LexerState,
+{
+    pub const fn transition<NewState: LexerState>(self) -> Lexer<'i, NewState> {
+        Lexer {
+            _s: PhantomData::<NewState>,
+            input: self.input,
+            chars: self.chars,
+            line_num: self.line_num,
+            col_num: self.col_num,
+        }
+    }
+}
+
+impl<'i, 'o> Lexer<'i, Base>
 where
     'i: 'o,
 {
@@ -53,7 +84,7 @@ where
             chars: input.chars().enumerate().peekable(),
             line_num: 0,
             col_num: 0,
-            tokens: vec![],
+            _s: PhantomData,
         }
     }
 
@@ -64,433 +95,55 @@ where
         }
     }
 
-    fn lex_one(&mut self) -> Result<bool, LexingError> {
+    fn lex_one(mut self) -> (Self, Token<'o>) {
         if let Some(&(i, c)) = self.chars.peek() {
-            match c {
+            return match c {
                 // whitespace
-                ' ' | '\t' => {
-                    self.lex_whitespace();
-                }
-                '\n' => {
-                    self.lex_newline();
-                }
-                '\r' => {
-                    self.lex_carriage_return();
-                }
+                ' ' | '\t' => self.transition::<WhiteSpace>().lex(i),
+                '\n' => self.transition::<LF>().lex(i),
+                '\r' => self.transition::<CR>().lex(i),
 
                 // single char
-                ';' => {
-                    self.tokens.push(Token::SemiColon);
-                    self.col_num += 1;
-                    self.chars.next();
-                }
-                ':' => {
-                    self.tokens.push(Token::Colon);
-                    self.col_num += 1;
-                    self.chars.next();
-                }
-                '(' => {
-                    self.tokens.push(Token::LeftParen);
-                    self.col_num += 1;
-                    self.chars.next();
-                }
-                ')' => {
-                    self.tokens.push(Token::RightParen);
-                    self.col_num += 1;
-                    self.chars.next();
-                }
-                '[' => {
-                    self.tokens.push(Token::LeftBracket);
-                    self.col_num += 1;
-                    self.chars.next();
-                }
-                ']' => {
-                    self.tokens.push(Token::RightBracket);
-                    self.col_num += 1;
-                    self.chars.next();
-                }
-                '{' => {
-                    self.tokens.push(Token::LeftBrace);
-                    self.col_num += 1;
-                    self.chars.next();
-                }
-                '}' => {
-                    self.tokens.push(Token::RightBrace);
-                    self.col_num += 1;
-                    self.chars.next();
-                }
+                ';' => self.single_char(Token::SemiColon(i)),
+                ':' => self.single_char(Token::Colon(i)),
+                '(' => self.single_char(Token::LeftParen(i)),
+                ')' => self.single_char(Token::RightParen(i)),
+                '[' => self.single_char(Token::LeftBracket(i)),
+                ']' => self.single_char(Token::RightBracket(i)),
+                '{' => self.single_char(Token::LeftBrace(i)),
+                '}' => self.single_char(Token::RightBrace(i)),
 
-                // identifier or keyword
-                'a'..='z' | 'A'..='Z' | '_' => {
-                    self.lex_identifier_or_keyword(i);
-                }
+                'a'..='z' | 'A'..='Z' | '_' => self.transition::<KeyworkOrIdentifier>().lex(i),
 
-                // numbers
-                '0' => {
-                    self.lex_number_starting_with_0()?;
-                }
-
-                '1'..='9' => {
-                    self.lex_number_starting_with_1_to_9(i, c)?;
-                }
+                '0'..='9' => self.transition::<Number>().lex(i, c),
 
                 _ => {
-                    return Err(LexingError::invalid_char(self.curr_point(), c));
-                }
-            }
-            return Ok(true);
-        }
-
-        self.tokens.push(Token::Eof);
-        Ok(false)
-    }
-
-    fn lex(mut self) -> Result<Vec<Token<'o>>, LexingError> {
-        while self.lex_one()? {}
-        Ok(self.tokens)
-    }
-
-    #[inline]
-    fn lex_whitespace(&mut self) {
-        self.tokens.push(Token::WhiteSpace);
-        self.col_num += 1;
-        self.chars.next();
-        while let Some((_, c2)) = &self.chars.peek()
-            && matches!(c2, ' ' | '\t')
-        {
-            self.col_num += 1;
-            self.chars.next();
-        }
-    }
-
-    #[inline]
-    fn lex_newline(&mut self) {
-        self.tokens.push(Token::NewLine);
-        self.col_num = 0;
-        self.line_num += 1;
-        self.chars.next();
-    }
-
-    #[inline]
-    fn lex_carriage_return(&mut self) {
-        self.tokens.push(Token::NewLine);
-        self.col_num = 0;
-        self.line_num += 1;
-        self.chars.next();
-        if let Some(&(_, c2)) = self.chars.peek()
-            && c2 == '\n'
-        {
-            self.chars.next();
-        }
-    }
-
-    #[inline]
-    fn lex_identifier_or_keyword(&mut self, i: usize) {
-        let start = i;
-        let mut end = start;
-        while let Some(&(_, c2)) = self.chars.peek()
-            && (c2.is_alphanumeric() || c2 == '_')
-        {
-            end += 1;
-            self.col_num += 1;
-            self.chars.next();
-        }
-        let s = &self.input[start..end];
-        self.tokens.push(match s {
-            "null" => Token::Null,
-            "true" => Token::True,
-            "false" => Token::False,
-            "break" => Token::Break,
-            "case" => Token::Case,
-            "catch" => Token::Catch,
-            "class" => Token::Class,
-            "const" => Token::Const,
-            "continue" => Token::Continue,
-            "debugger" => Token::Debugger,
-            "default" => Token::Default,
-            "delete" => Token::Delete,
-            "do" => Token::Do,
-            "else" => Token::Else,
-            "export" => Token::Export,
-            "extends" => Token::Extends,
-            "finally" => Token::Finally,
-            "for" => Token::For,
-            "function" => Token::Function,
-            "if" => Token::If,
-            "import" => Token::Import,
-            "in" => Token::In,
-            "instanceof" => Token::Instanceof,
-            "new" => Token::New,
-            "return" => Token::Return,
-            "super" => Token::Super,
-            "switch" => Token::Switch,
-            "this" => Token::This,
-            "throw" => Token::Throw,
-            "try" => Token::Try,
-            "typeof" => Token::Typeof,
-            "var" => Token::Var,
-            "void" => Token::Void,
-            "while" => Token::While,
-            "with" => Token::With,
-            "let" => Token::Let,
-            "static" => Token::Static,
-            "yield" => Token::Yield,
-            "await" => Token::Await,
-            "async" => Token::Async,
-            "arguments" => Token::Arguments,
-            "as" => Token::As,
-            "eval" => Token::Eval,
-            "from" => Token::From,
-            "get" => Token::Get,
-            "of" => Token::Of,
-            "set" => Token::Set,
-            "enum" => Token::Enum,
-            "implements" => Token::Implements,
-            "interface" => Token::Interface,
-            "package" => Token::Package,
-            "private" => Token::Private,
-            "protected" => Token::Protected,
-            "public" => Token::Public,
-            _ => Token::Identifier(s),
-        });
-    }
-
-    #[inline]
-    fn lex_number_starting_with_0(&mut self) -> Result<(), LexingError> {
-        self.col_num += 1;
-        self.chars.next();
-        if let Some(&(i, c2)) = self.chars.peek() {
-            return match c2 {
-                'b' | 'B' => {
-                    self.lex_number_with_alt_base(2, |c| matches!(c, '0'..='1'), Token::Binary, i)
-                }
-                'x' | 'X' => self.lex_number_with_alt_base(
-                    16,
-                    |c| c.is_ascii_hexdigit(),
-                    Token::Hexadecimal,
-                    i,
-                ),
-                'o' | 'O' => {
-                    self.lex_number_with_alt_base(8, |c| matches!(c, '0'..='7'), Token::Octal, i)
-                }
-                '0'..='9' => self.lex_number_with_leading_0_but_2nd_char_is_digit(i),
-                'n' => {
-                    self.tokens.push(Token::BigInt(&self.input[(i - 1)..=i]));
-                    self.col_num += 1;
-                    self.chars.next();
-                    Ok(())
-                }
-                _ => {
-                    self.tokens.push(Token::Decimal(0.0.into()));
-                    Ok(())
+                    let token = Token::Invalid(&self.input[i..=i]);
+                    (self, token)
                 }
             };
         }
-
-        self.tokens.push(Token::Decimal(0.0.into()));
-        Ok(())
+        (self, Token::Eof)
     }
 
-    fn try_parse_int_token<T>(
-        &self,
-        num_str: String,
-        radix: u32,
-        token_fn: T,
-    ) -> Result<Token<'o>, LexingError>
-    where
-        T: Fn(i64) -> Token<'o>,
-    {
-        i64::from_str_radix(&num_str, radix)
-            .map(token_fn)
-            .map_err(|e| LexingError::invalid_number(self.curr_point(), num_str, e.to_string()))
-    }
+    fn lex(mut self) -> Vec<Token<'o>> {
+        let mut tokens: Vec<Token<'o>> = vec![];
+        loop {
+            let (new_self, token) = self.lex_one();
+            self = new_self;
 
-    fn lex_number_with_alt_base<M, T>(
-        &mut self,
-        radix: u32,
-        matcher: M,
-        token_fn: T,
-        i: usize,
-    ) -> Result<(), LexingError>
-    where
-        M: Fn(char) -> bool,
-        T: Fn(i64) -> Token<'o>,
-    {
-        let mut num_str = String::new();
-        self.col_num += 1;
-        self.chars.next();
-        let mut is_big = false;
-        while let Some(&(_, c3)) = self.chars.peek()
-            && (matcher(c3) || c3 == 'n')
-            && !is_big
-        {
-            if c3 == 'n' {
-                is_big = true;
-            }
-            num_str.push(c3);
-            self.col_num += 1;
-            self.chars.next();
-        }
-        let token = if is_big {
-            Token::BigInt(&self.input[(i - 1)..=(i + num_str.len())])
-        } else {
-            self.try_parse_int_token(num_str, radix, token_fn)?
-        };
-        self.tokens.push(token);
-        Ok(())
-    }
-
-    #[inline]
-    fn lex_number_with_leading_0_but_2nd_char_is_digit(
-        &mut self,
-        i: usize,
-    ) -> Result<(), LexingError> {
-        let mut num_str = String::new();
-        let mut is_octal = true;
-        let mut is_big = false;
-        while let Some(&(_, c3)) = self.chars.peek()
-            && matches!(c3, '0'..='9' | 'n')
-            && !is_big
-        {
-            if c3 == 'n' {
-                is_big = true;
-            }
-            num_str.push(c3);
-            self.col_num += 1;
-            self.chars.next();
-            is_octal = is_octal && matches!(c3, '0'..='7');
-        }
-        if is_big {
-            let token = Token::BigInt(&self.input[(i - 1)..(i + num_str.len())]);
-            self.tokens.push(token);
-        } else if is_octal {
-            let token = self.try_parse_int_token(num_str, 8, Token::Octal)?;
-            self.tokens.push(token);
-        } else {
-            match num_str.parse::<f64>() {
-                Ok(f) => {
-                    self.tokens.push(Token::Decimal(f.into()));
+            match token {
+                Token::Eof => {
+                    tokens.push(Token::Eof);
+                    return tokens;
                 }
-                Err(e) => {
-                    return Err(LexingError::invalid_number(
-                        self.curr_point(),
-                        num_str,
-                        e.to_string(),
-                    ));
-                }
+                _ => tokens.push(token),
             }
         }
-        Ok(())
-    }
-
-    #[inline]
-    fn lex_number_starting_with_1_to_9(&mut self, i: usize, c: char) -> Result<(), LexingError> {
-        let start = i;
-        let mut end = i;
-        let mut num_str = String::from(c);
-        let mut exponent = String::new();
-        let mut has_exp = false;
-        let mut has_decimal_point = false;
-        self.col_num += 1;
-        self.chars.next();
-        let mut is_big = false;
-        while let Some(&(_, c2)) = self.chars.peek() {
-            match c2 {
-                '_' => {
-                    end += 1;
-                    self.col_num += 1;
-                    self.chars.next();
-                }
-                '0'..='9' => {
-                    if has_exp {
-                        exponent.push(c2);
-                    } else {
-                        num_str.push(c2);
-                    }
-                    end += 1;
-                    self.col_num += 1;
-                    self.chars.next();
-                }
-                'e' | 'E' => {
-                    if has_exp {
-                        break;
-                    }
-                    has_exp = true;
-                    end += 1;
-                    self.col_num += 1;
-                    self.chars.next();
-                    if let Some(&(_, c3)) = self.chars.peek()
-                        && !matches!(c3, '-' | '0'..='9')
-                    {
-                        break;
-                    }
-                }
-                '-' => {
-                    if !has_exp || !exponent.is_empty() {
-                        break;
-                    }
-                    exponent.push('-');
-                    end += 1;
-                    self.col_num += 1;
-                    self.chars.next();
-                }
-                '.' => {
-                    if has_decimal_point || has_exp {
-                        break;
-                    }
-                    has_decimal_point = true;
-                    end += 1;
-                    num_str.push('.');
-                    self.col_num += 1;
-                    self.chars.next();
-                }
-                'n' => {
-                    is_big = true;
-                    end += 1;
-                    num_str.push('n');
-                    self.col_num += 1;
-                    self.chars.next();
-                    break;
-                }
-                _ => {
-                    break;
-                }
-            }
-        }
-
-        if is_big {
-            self.tokens.push(Token::BigInt(&self.input[start..=end]));
-            return Ok(());
-        }
-
-        let base = num_str.parse::<f64>().map_err(|e| {
-            LexingError::invalid_number(
-                self.curr_point(),
-                self.input[start..end].to_string(),
-                e.to_string(),
-            )
-        })?;
-
-        if has_exp {
-            self.tokens.push(Token::Exponential {
-                base: base.into(),
-                exp: exponent.parse::<i64>().map_err(|e| {
-                    LexingError::invalid_number(
-                        self.curr_point(),
-                        self.input[start..end].to_string(),
-                        e.to_string(),
-                    )
-                })?,
-            });
-        } else {
-            self.tokens.push(Token::Decimal(base.into()));
-        }
-
-        Ok(())
     }
 }
 
-pub fn lex(input: &str) -> Result<Vec<Token<'_>>, LexingError> {
+pub fn lex(input: &str) -> Vec<Token<'_>> {
     Lexer::new(input).lex()
 }
 
@@ -499,233 +152,6 @@ mod tests {
 
     use super::*;
     use rstest::*;
-
-    #[rstest]
-    // single chars
-    #[case("(", Token::LeftParen)]
-    #[case(")", Token::RightParen)]
-    #[case("[", Token::LeftBracket)]
-    #[case("]", Token::RightBracket)]
-    #[case("{", Token::LeftBrace)]
-    #[case("}", Token::RightBrace)]
-    #[case(";", Token::SemiColon)]
-    #[case(":", Token::Colon)]
-    // newlines
-    #[case("\n", Token::NewLine)]
-    #[case("\r\n", Token::NewLine)]
-    #[case("\r", Token::NewLine)]
-    // whitespace
-    #[case(" ", Token::WhiteSpace)]
-    #[case("\t", Token::WhiteSpace)]
-    #[case(" \t ", Token::WhiteSpace)]
-    // identifiers
-    #[case("x", Token::Identifier("x"))]
-    #[case("x2", Token::Identifier("x2"))]
-    #[case("myvar", Token::Identifier("myvar"))]
-    #[case("myvar2", Token::Identifier("myvar2"))]
-    #[case("a1b2c3", Token::Identifier("a1b2c3"))]
-    #[case("my_var", Token::Identifier("my_var"))]
-    #[case("my_other_var", Token::Identifier("my_other_var"))]
-    #[case("_x", Token::Identifier("_x"))]
-    #[case("_1", Token::Identifier("_1"))]
-    // numbers
-    #[case("0", Token::Decimal(0.0.into()))]
-    #[case("1", Token::Decimal(1.0.into()))]
-    #[case("9", Token::Decimal(9.0.into()))]
-    #[case("1_2", Token::Decimal(12.0.into()))]
-    #[case("9_9", Token::Decimal(99.0.into()))]
-    #[case("1_23_4", Token::Decimal(1234.0.into()))]
-    #[case("1.2", Token::Decimal(1.2.into()))]
-    #[case("9.9", Token::Decimal(9.9.into()))]
-    #[case("1_2.3_4", Token::Decimal(12.34.into()))]
-    #[case("2e3", Token::Exponential{base: 2.0.into(), exp: 3})]
-    #[case("1_2e3_4", Token::Exponential{base: 12.0.into(), exp: 34})]
-    #[case("1.2e3", Token::Exponential{base: 1.2.into(), exp: 3})]
-    #[case("1.2e-3", Token::Exponential{base: 1.2.into(), exp: -3})]
-    #[case("1_2.3_4e-5_6", Token::Exponential{base: 12.34.into(), exp: -56})]
-    #[case("9_9.9_9e9_9", Token::Exponential{base: 99.99.into(), exp: 99})]
-    #[case("9_9.9_9e-9_9", Token::Exponential{base: 99.99.into(), exp: -99})]
-    #[case("0X0", Token::Hexadecimal(0))]
-    #[case("0x0", Token::Hexadecimal(0))]
-    #[case("0x1", Token::Hexadecimal(1))]
-    #[case("0x123456789", Token::Hexadecimal(0x1_2345_6789))]
-    #[case("0xABCDEF0", Token::Hexadecimal(0xABC_DEF0))]
-    #[case("0xabcdef0", Token::Hexadecimal(0xABC_DEF0))]
-    #[case("0b1010", Token::Binary(0b1010))]
-    #[case("0B0101", Token::Binary(0b0101))]
-    #[case("0b111", Token::Binary(0b111))]
-    #[case("0b000", Token::Binary(0b0))]
-    #[case("0o77", Token::Octal(0o77))]
-    #[case("0O77", Token::Octal(0o77))]
-    #[case("077", Token::Octal(0o77))]
-    #[case("0o0", Token::Octal(0o0))]
-    #[case("0o1", Token::Octal(0o1))]
-    #[case("08", Token::Decimal(8.0.into()))]
-    #[case("09", Token::Decimal(9.0.into()))]
-    #[case("0989", Token::Decimal(989.0.into()))]
-    #[case("1n", Token::BigInt("1n"))]
-    #[case("99n", Token::BigInt("99n"))]
-    #[case("0b1n", Token::BigInt("0b1n"))]
-    #[case("0B1n", Token::BigInt("0B1n"))]
-    #[case("0b101n", Token::BigInt("0b101n"))]
-    #[case("0xfn", Token::BigInt("0xfn"))]
-    #[case("0XFn", Token::BigInt("0XFn"))]
-    #[case("0xFFn", Token::BigInt("0xFFn"))]
-    #[case("0o7n", Token::BigInt("0o7n"))]
-    #[case("0O7n", Token::BigInt("0O7n"))]
-    #[case("0o77n", Token::BigInt("0o77n"))]
-    #[case("07n", Token::BigInt("07n"))]
-    #[case("08n", Token::BigInt("08n"))]
-    #[case("077n", Token::BigInt("077n"))]
-    #[case("088n", Token::BigInt("088n"))]
-    // keywords
-    #[case("null", Token::Null)]
-    #[case("true", Token::True)]
-    #[case("false", Token::False)]
-    #[case("break", Token::Break)]
-    #[case("case", Token::Case)]
-    #[case("catch", Token::Catch)]
-    #[case("class", Token::Class)]
-    #[case("const", Token::Const)]
-    #[case("continue", Token::Continue)]
-    #[case("debugger", Token::Debugger)]
-    #[case("default", Token::Default)]
-    #[case("delete", Token::Delete)]
-    #[case("do", Token::Do)]
-    #[case("else", Token::Else)]
-    #[case("export", Token::Export)]
-    #[case("extends", Token::Extends)]
-    #[case("finally", Token::Finally)]
-    #[case("for", Token::For)]
-    #[case("function", Token::Function)]
-    #[case("if", Token::If)]
-    #[case("import", Token::Import)]
-    #[case("in", Token::In)]
-    #[case("instanceof", Token::Instanceof)]
-    #[case("new", Token::New)]
-    #[case("return", Token::Return)]
-    #[case("super", Token::Super)]
-    #[case("switch", Token::Switch)]
-    #[case("this", Token::This)]
-    #[case("throw", Token::Throw)]
-    #[case("try", Token::Try)]
-    #[case("typeof", Token::Typeof)]
-    #[case("var", Token::Var)]
-    #[case("void", Token::Void)]
-    #[case("while", Token::While)]
-    #[case("with", Token::With)]
-    #[case("let", Token::Let)]
-    #[case("static", Token::Static)]
-    #[case("yield", Token::Yield)]
-    #[case("await", Token::Await)]
-    #[case("async", Token::Async)]
-    #[case("arguments", Token::Arguments)]
-    #[case("as", Token::As)]
-    #[case("eval", Token::Eval)]
-    #[case("from", Token::From)]
-    #[case("get", Token::Get)]
-    #[case("of", Token::Of)]
-    #[case("set", Token::Set)]
-    #[case("enum", Token::Enum)]
-    #[case("implements", Token::Implements)]
-    #[case("interface", Token::Interface)]
-    #[case("package", Token::Package)]
-    #[case("private", Token::Private)]
-    #[case("protected", Token::Protected)]
-    #[case("public", Token::Public)]
-    fn single_token(#[case] s: &str, #[case] expected: Token) {
-        let tokens = lex(s).expect("failed to lex");
-        assert_eq!(expected, tokens[0]);
-        assert_eq!(2, tokens.len());
-        assert_eq!(Token::Eof, tokens[1]);
-    }
-
-    #[rstest]
-    // only newlines
-    #[case("\n", 1)]
-    #[case("\r", 1)]
-    #[case("\n\n", 2)]
-    #[case("\n\r", 2)]
-    #[case("\r\n", 1)]
-    #[case("\r\r", 2)]
-    #[case("\r\n\n", 2)]
-    #[case("\n\r\n", 2)]
-    #[case("\n\n\r", 3)]
-    #[case("\n\r\r", 3)]
-    #[case("\r\n\r", 2)]
-    #[case("\r\r\n", 2)]
-    #[case("\r\n\r\n", 2)]
-    // with extras
-    #[case(" \n ", 1)]
-    #[case(" \r ", 1)]
-    #[case(" \n\n ", 2)]
-    #[case(" \n\r ", 2)]
-    #[case(" \r\n ", 1)]
-    #[case(" \r\r ", 2)]
-    #[case("\r \n", 2)]
-    #[case("\n \r", 2)]
-    #[case(" \r \n ", 2)]
-    fn count_new_lines(#[case] s: &str, #[case] expected: usize) {
-        let tokens = lex(s).expect("failed to lex");
-        let count = tokens
-            .iter()
-            .filter(|x| matches!(x, Token::NewLine))
-            .count();
-        assert_eq!(expected, count);
-    }
-
-    #[rstest]
-    #[case(" ", 1)]
-    #[case("  ", 1)]
-    #[case("\t", 1)]
-    #[case("\t\t", 1)]
-    #[case(" \t", 1)]
-    #[case("\t ", 1)]
-    #[case(" \t ", 1)]
-    #[case("\t \t", 1)]
-    #[case(" \n ", 2)]
-    #[case("\t\n\t", 2)]
-    #[case(" ; ", 2)]
-    #[case(" ;\t", 2)]
-    #[case("\t; ", 2)]
-    #[case("\t;\t", 2)]
-    fn count_whitespace(#[case] s: &str, #[case] expected: usize) {
-        let tokens = lex(s).expect("failed to lex");
-        let count = tokens
-            .iter()
-            .filter(|x| matches!(x, Token::WhiteSpace))
-            .count();
-        assert_eq!(expected, count);
-    }
-
-    #[rstest]
-    #[case("0 0 0", vec![Token::Decimal(0.0.into()), Token::WhiteSpace, Token::Decimal(0.0.into()), Token::WhiteSpace, Token::Decimal(0.0.into()), Token::Eof])]
-    #[case("1 2 3", vec![Token::Decimal(1.0.into()), Token::WhiteSpace, Token::Decimal(2.0.into()), Token::WhiteSpace, Token::Decimal(3.0.into()), Token::Eof])]
-    #[case("19 28 37", vec![Token::Decimal(19.0.into()), Token::WhiteSpace, Token::Decimal(28.0.into()), Token::WhiteSpace, Token::Decimal(37.0.into()), Token::Eof])]
-    #[case("0x0 0x0 0x0", vec![Token::Hexadecimal(0), Token::WhiteSpace, Token::Hexadecimal(0), Token::WhiteSpace, Token::Hexadecimal(0), Token::Eof])]
-    #[case("0x1 0X2 0x3", vec![Token::Hexadecimal(1), Token::WhiteSpace, Token::Hexadecimal(2), Token::WhiteSpace, Token::Hexadecimal(3), Token::Eof])]
-    #[case("0xAb 0XcD 0xEF", vec![Token::Hexadecimal(0xAB), Token::WhiteSpace, Token::Hexadecimal(0xCD), Token::WhiteSpace, Token::Hexadecimal(0xEF), Token::Eof])]
-    #[case("0b111 0B1010 0b000", vec![Token::Binary(0b111), Token::WhiteSpace, Token::Binary(0b1010), Token::WhiteSpace, Token::Binary(0b0), Token::Eof])]
-    #[case("0o123 077 090 0O70", vec![Token::Octal(0o123), Token::WhiteSpace, Token::Octal(0o77), Token::WhiteSpace, Token::Decimal(90.0.into()), Token::WhiteSpace, Token::Octal(0o70), Token::Eof])]
-    #[case("0n 1n 9n", vec![Token::BigInt("0n"), Token::WhiteSpace, Token::BigInt("1n"), Token::WhiteSpace, Token::BigInt("9n"), Token::Eof])]
-    #[case("0x0n 0Xfn 0xFn", vec![Token::BigInt("0x0n"), Token::WhiteSpace, Token::BigInt("0Xfn"), Token::WhiteSpace, Token::BigInt("0xFn"), Token::Eof])]
-    #[case("0b1n 0B1n 0b101n", vec![Token::BigInt("0b1n"), Token::WhiteSpace, Token::BigInt("0B1n"), Token::WhiteSpace, Token::BigInt("0b101n"), Token::Eof])]
-    #[case("0o0n 0O7n 0o77n", vec![Token::BigInt("0o0n"), Token::WhiteSpace, Token::BigInt("0O7n"), Token::WhiteSpace, Token::BigInt("0o77n"), Token::Eof])]
-    #[case("00n 07n 08n", vec![Token::BigInt("00n"), Token::WhiteSpace, Token::BigInt("07n"), Token::WhiteSpace, Token::BigInt("08n"), Token::Eof])]
-    fn numbers(#[case] s: &str, #[case] expected: Vec<Token>) {
-        let tokens = lex(s).expect("failed to lex");
-        assert_eq!(expected, tokens);
-    }
-
-    #[rstest]
-    #[case("a b c", vec![Token::Identifier("a"), Token::WhiteSpace, Token::Identifier("b"), Token::WhiteSpace, Token::Identifier("c"), Token::Eof])]
-    #[case("a1 b9 c0", vec![Token::Identifier("a1"), Token::WhiteSpace, Token::Identifier("b9"), Token::WhiteSpace, Token::Identifier("c0"), Token::Eof])]
-    #[case("_X _y _Z", vec![Token::Identifier("_X"), Token::WhiteSpace, Token::Identifier("_y"), Token::WhiteSpace, Token::Identifier("_Z"), Token::Eof])]
-    #[case("public class Foo", vec![Token::Public, Token::WhiteSpace, Token::Class, Token::WhiteSpace, Token::Identifier("Foo"), Token::Eof])]
-    fn identifiers(#[case] s: &str, #[case] expected: Vec<Token>) {
-        let tokens = lex(s).expect("failed to lex");
-        assert_eq!(expected, tokens);
-    }
 
     #[rstest]
     #[case("int ABCD yz", vec![3, 4, 8, 9, 11])]
@@ -739,10 +165,9 @@ mod tests {
     fn columns_numbers(#[case] s: &str, #[case] token_lengths: Vec<usize>) {
         let mut lexer = Lexer::new(s);
         for len in token_lengths {
-            assert!(lexer.lex_one().unwrap());
+            (lexer, _) = lexer.lex_one();
             assert_eq!(0, lexer.line_num);
             assert_eq!(len, lexer.col_num);
         }
-        assert!(!lexer.lex_one().unwrap());
     }
 }
