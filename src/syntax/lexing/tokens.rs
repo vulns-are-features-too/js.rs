@@ -142,6 +142,7 @@ pub enum Token<'a> {
     Caret(usize),           // ^
     Tilde(usize),           // ~
     Dot(usize),             // .
+    Dot2(usize),            // ..
     Dot3(usize),            // ...
     Comma(usize),           // ,
     Colon(usize),           // :

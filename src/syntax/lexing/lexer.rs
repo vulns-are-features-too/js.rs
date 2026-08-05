@@ -6,9 +6,22 @@ use std::{
 
 use crate::syntax::{
     lexing::{
+        ampersand::Ampersand,
+        bang::Bang,
+        div::Div,
+        dot::Dot,
+        equal::Equal,
+        gt::Greater,
         keyword_or_identifier::KeyworkOrIdentifier,
+        lt::Less,
+        minus::Minus,
         newline::{CR, LF},
         number::Number,
+        percent::Percent,
+        pipe::Pipe,
+        plus::Plus,
+        question::Question,
+        star::Star,
         tokens::Token,
         whitespace::WhiteSpace,
     },
@@ -77,6 +90,16 @@ where
         self.col_num += 1;
         self.chars.next();
     }
+
+    pub fn eat(&mut self, ch: char) -> bool {
+        match self.chars.peek() {
+            Some(&(_, c)) if c == ch => {
+                self.next_char();
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 impl<'i, 'o> Lexer<'i, Base>
@@ -125,6 +148,19 @@ where
 
                 '0'..='9' => self.transition::<Number>().lex(i, c),
 
+                '=' => self.transition::<Equal>().lex(i),
+                '!' => self.transition::<Bang>().lex(i),
+                '>' => self.transition::<Greater>().lex(i),
+                '<' => self.transition::<Less>().lex(i),
+                '+' => self.transition::<Plus>().lex(i),
+                '-' => self.transition::<Minus>().lex(i),
+                '*' => self.transition::<Star>().lex(i),
+                '/' => self.transition::<Div>().lex(i),
+                '%' => self.transition::<Percent>().lex(i),
+                '&' => self.transition::<Ampersand>().lex(i),
+                '|' => self.transition::<Pipe>().lex(i),
+                '.' => self.transition::<Dot>().lex(i),
+                '?' => self.transition::<Question>().lex(i),
                 _ => {
                     let token = Token::Invalid(&self.input[i..=i]);
                     (self, token)
