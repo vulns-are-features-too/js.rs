@@ -32,6 +32,9 @@ mod tests {
     #[case("}", Token::RightBrace(0))]
     #[case(";", Token::SemiColon(0))]
     #[case(":", Token::Colon(0))]
+    #[case("^", Token::Caret(0))]
+    #[case("~", Token::Tilde(0))]
+    #[case(",", Token::Comma(0))]
     fn single_token(#[case] s: &str, #[case] expected: Token) {
         let tokens = lex(s);
         assert_eq!(expected, tokens[0]);

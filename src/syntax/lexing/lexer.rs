@@ -112,6 +112,9 @@ where
                 ']' => self.single_char(Token::RightBracket(i)),
                 '{' => self.single_char(Token::LeftBrace(i)),
                 '}' => self.single_char(Token::RightBrace(i)),
+                '^' => self.single_char(Token::Caret(i)),
+                '~' => self.single_char(Token::Tilde(i)),
+                ',' => self.single_char(Token::Comma(i)),
 
                 'a'..='z' | 'A'..='Z' | '_' => self.transition::<KeyworkOrIdentifier>().lex(i),
 
