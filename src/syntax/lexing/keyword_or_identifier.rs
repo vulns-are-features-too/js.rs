@@ -17,8 +17,7 @@ where
             && (c2.is_alphanumeric() || c2 == '_')
         {
             end += 1;
-            self.col_num += 1;
-            self.chars.next();
+            self.next_char();
         }
         let s = &self.input[start..end];
         let token = match s {

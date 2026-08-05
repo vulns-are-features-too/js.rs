@@ -13,14 +13,12 @@ where
 {
     pub fn lex(mut self, start: usize) -> (Lexer<'i, Base>, Token<'o>) {
         let mut end = start;
-        self.col_num += 1;
-        self.chars.next();
+        self.next_char();
         while let Some((_, c2)) = &self.chars.peek()
             && matches!(c2, ' ' | '\t')
         {
             end += 1;
-            self.col_num += 1;
-            self.chars.next();
+            self.next_char();
         }
         let token = Token::WhiteSpace(&self.input[start..=end]);
         (self.transition(), token)

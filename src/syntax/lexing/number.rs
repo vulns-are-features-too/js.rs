@@ -36,8 +36,7 @@ where
     'i: 'o,
 {
     fn lex(mut self, start: usize) -> (Lexer<'i, Base>, Token<'o>) {
-        self.col_num += 1;
-        self.chars.next();
+        self.next_char();
         if let Some(&(_, c2)) = self.chars.peek() {
             return match c2 {
                 'b' | 'B' => self.transition::<BinInt>().lex(start),
@@ -47,8 +46,7 @@ where
                 '8'..='9' => self.transition::<Decimal>().lex(start, 1),
                 'e' | 'E' => self.transition::<Exponential>().lex(start),
                 'n' => {
-                    self.col_num += 1;
-                    self.chars.next();
+                    self.next_char();
                     let token = Token::BigInt(&self.input[start..=(start + 1)]);
                     (self.transition(), token)
                 }
@@ -69,23 +67,20 @@ where
 {
     fn lex(mut self, start: usize) -> (Lexer<'i, Base>, Token<'o>) {
         let mut end = start + 1;
-        self.col_num += 1;
-        self.chars.next();
+        self.next_char();
         let mut e = false;
         while let Some(&(_, c)) = self.chars.peek()
             && matches!(c, '0' | '1' | 'e' | '_')
             && !(e && c == 'e')
         {
             end += 1;
-            self.col_num += 1;
-            self.chars.next();
+            self.next_char();
             e = e || c == 'e';
         }
         let token = match self.chars.peek() {
             Some((_, 'n')) => {
                 end += 1;
-                self.col_num += 1;
-                self.chars.next();
+                self.next_char();
                 if e {
                     Token::BigExpBin(&self.input[start..=end])
                 } else {
@@ -112,8 +107,7 @@ where
         let mut end = start;
         if has_o {
             end += 1;
-            self.col_num += 1;
-            self.chars.next();
+            self.next_char();
         }
         let mut e = false;
         while let Some(&(_, c)) = self.chars.peek()
@@ -121,8 +115,7 @@ where
             && !(e && c == 'e')
         {
             end += 1;
-            self.col_num += 1;
-            self.chars.next();
+            self.next_char();
             e = e || c == 'e';
         }
         if let Some((_, '8'..='9')) = self.chars.peek() {
@@ -131,8 +124,7 @@ where
         let token = match self.chars.peek() {
             Some((_, 'n')) => {
                 end += 1;
-                self.col_num += 1;
-                self.chars.next();
+                self.next_char();
                 if e {
                     Token::BigExpOct(&self.input[start..=end])
                 } else {
@@ -157,20 +149,17 @@ where
 {
     fn lex(mut self, start: usize) -> (Lexer<'i, Base>, Token<'o>) {
         let mut end = start + 1;
-        self.col_num += 1;
-        self.chars.next();
+        self.next_char();
         while let Some(&(_, c)) = self.chars.peek()
             && (c.is_ascii_hexdigit() || c == '_')
         {
             end += 1;
-            self.col_num += 1;
-            self.chars.next();
+            self.next_char();
         }
         let token = match self.chars.peek() {
             Some((new_end, 'n')) => {
                 end = *new_end;
-                self.col_num += 1;
-                self.chars.next();
+                self.next_char();
                 Token::BigHex(&self.input[start..=end])
             }
             _ => Token::Hexadecimal(&self.input[start..=end]),
@@ -186,13 +175,11 @@ where
     fn lex(mut self, start: usize, leading_zeros: usize) -> (Lexer<'i, Base>, Token<'o>) {
         let mut dot = false;
         let mut end = start + leading_zeros;
-        self.col_num += 1;
-        self.chars.next();
+        self.next_char();
         while let Some(&(_, c)) = self.chars.peek() {
             match c {
                 '0'..='9' | '_' => {
-                    self.col_num += 1;
-                    self.chars.next();
+                    self.next_char();
                     end += 1;
                 }
                 '.' => {
@@ -200,8 +187,7 @@ where
                         break;
                     }
                     dot = true;
-                    self.col_num += 1;
-                    self.chars.next();
+                    self.next_char();
                     end += 1;
                 }
                 'e' => {
@@ -215,8 +201,7 @@ where
         let token = match self.chars.peek() {
             Some((new_end, 'n')) => {
                 end = *new_end;
-                self.col_num += 1;
-                self.chars.next();
+                self.next_char();
                 Token::BigInt(&self.input[start..=end])
             }
             _ => Token::Decimal(&self.input[start..=end]),
@@ -231,16 +216,13 @@ where
 {
     fn lex(mut self, start: usize) -> (Lexer<'i, Base>, Token<'o>) {
         let mut end = start;
-        self.col_num += 1;
-        self.chars.next();
+        self.next_char();
         if let Some(&(e, '0'..='9' | '_' | '-')) = self.chars.peek() {
-            self.col_num += 1;
-            self.chars.next();
+            self.next_char();
             end = e;
         }
         while let Some(&(e, '0'..='9' | '_')) = self.chars.peek() {
-            self.col_num += 1;
-            self.chars.next();
+            self.next_char();
             end = e;
         }
         let token = Token::Exponential(&self.input[start..=end]);

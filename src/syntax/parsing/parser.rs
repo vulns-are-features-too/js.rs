@@ -1,4 +1,4 @@
-use crate::syntax::{parsing::ast::Ast, lexing::tokens::Token};
+use crate::syntax::{lexing::tokens::Token, parsing::ast::Ast};
 
 #[derive(Debug)]
 pub enum ParsingError {}

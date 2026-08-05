@@ -9,19 +9,32 @@ pub enum Token<'a> {
     True(usize),
     False(usize),
     Decimal(&'a str),
-    Exponential(&'a str), /// beN/bEN where b=base, N=exponent
-    BigExpDec(&'a str),   /// [0-9]...e...n
-    BigInt(&'a str),      /// ends with n
-    Binary(&'a str),      /// starts with 0b/0B
-    BigBin(&'a str),      /// 0b...n
-    ExpBin(&'a str),      /// 0b...e...
-    BigExpBin(&'a str),   /// 0b...e...n
-    Octal(&'a str),       /// starts with 0/0o/0O
-    BigOct(&'a str),      /// 0o...n
-    ExpOct(&'a str),      /// 0o...e...
-    BigExpOct(&'a str),   /// 0o...e...n
-    Hexadecimal(&'a str), /// starts with 0x/0X
-    BigHex(&'a str),      /// 0x...n
+    Exponential(&'a str),
+    /// beN/bEN where b=base, N=exponent
+    BigExpDec(&'a str),
+    /// [0-9]...e...n
+    BigInt(&'a str),
+    /// ends with n
+    Binary(&'a str),
+    /// starts with 0b/0B
+    BigBin(&'a str),
+    /// 0b...n
+    ExpBin(&'a str),
+    /// 0b...e...
+    BigExpBin(&'a str),
+    /// 0b...e...n
+    Octal(&'a str),
+    /// starts with 0/0o/0O
+    BigOct(&'a str),
+    /// 0o...n
+    ExpOct(&'a str),
+    /// 0o...e...
+    BigExpOct(&'a str),
+    /// 0o...e...n
+    Hexadecimal(&'a str),
+    /// starts with 0x/0X
+    BigHex(&'a str),
+    /// 0x...n
     String(&'a str),
     Regex(&'a str),
     Template(&'a str),

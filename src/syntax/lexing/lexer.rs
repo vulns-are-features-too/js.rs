@@ -72,6 +72,11 @@ where
             col_num: self.col_num,
         }
     }
+
+    pub fn next_char(&mut self) {
+        self.col_num += 1;
+        self.chars.next();
+    }
 }
 
 impl<'i, 'o> Lexer<'i, Base>

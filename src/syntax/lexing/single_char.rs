@@ -3,17 +3,14 @@ use crate::syntax::lexing::{
     tokens::Token,
 };
 
-
 impl<'i, 'o> Lexer<'i, Base>
 where
     'i: 'o,
 {
     pub fn single_char(mut self, token: Token<'o>) -> (Self, Token<'o>) {
-        self.col_num += 1;
-        self.chars.next();
+        self.next_char();
         (self.transition(), token)
     }
-
 }
 
 #[cfg(test)]
