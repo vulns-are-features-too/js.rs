@@ -125,6 +125,9 @@ where
             self.chars.next();
             e = e || c == 'e';
         }
+        if let Some((_, '8'..='9')) = self.chars.peek() {
+            return self.transition::<Decimal>().lex(start, end - start + 1);
+        }
         let token = match self.chars.peek() {
             Some((_, 'n')) => {
                 end += 1;
@@ -289,6 +292,9 @@ mod tests {
     #[case("08", Token::Decimal("08"))]
     #[case("09", Token::Decimal("09"))]
     #[case("0989", Token::Decimal("0989"))]
+    #[case("009", Token::Decimal("009"))]
+    #[case("0789", Token::Decimal("0789"))]
+    #[case("000789", Token::Decimal("000789"))]
     #[case("1n", Token::BigInt("1n"))]
     #[case("99n", Token::BigInt("99n"))]
     #[case("0b1n", Token::BigBin("0b1n"))]
@@ -325,6 +331,8 @@ mod tests {
     #[case("0b1n 0B1n 0b101n", vec![Token::BigBin("0b1n"), Token::WhiteSpace(" "), Token::BigBin("0B1n"), Token::WhiteSpace(" "), Token::BigBin("0b101n"), Token::Eof])]
     #[case("0o0n 0O7n 0o77n", vec![Token::BigOct("0o0n"), Token::WhiteSpace(" "), Token::BigOct("0O7n"), Token::WhiteSpace(" "), Token::BigOct("0o77n"), Token::Eof])]
     #[case("00n 07n 08n", vec![Token::BigOct("00n"), Token::WhiteSpace(" "), Token::BigOct("07n"), Token::WhiteSpace(" "), Token::BigInt("08n"), Token::Eof])]
+    #[case("0079 0077 0078", vec![Token::Decimal("0079"), Token::WhiteSpace(" "), Token::Octal("0077"), Token::WhiteSpace(" "), Token::Decimal("0078"), Token::Eof])]
+    #[case("0079n 0077n 0078n", vec![Token::BigInt("0079n"), Token::WhiteSpace(" "), Token::BigOct("0077n"), Token::WhiteSpace(" "), Token::BigInt("0078n"), Token::Eof])]
     fn numbers(#[case] s: &str, #[case] expected: Vec<Token>) {
         let tokens = lex(s);
         assert_eq!(expected, tokens);
