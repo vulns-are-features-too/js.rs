@@ -206,9 +206,9 @@ mod tests {
     #[case("0 0xF 0b1 0o7 077 9", vec![1, 2, 5, 6, 9, 10, 13, 14, 17, 18, 19])]
     #[case("0n 0xFn 0b1n 0o7n 077n 9n", vec![2, 3, 7, 8, 12, 13, 17, 18, 22, 23, 25])]
     #[case("public class Foo {}", vec![6, 7, 12, 13, 16, 17, 18, 19])]
-    fn columns_numbers(#[case] s: &str, #[case] token_lengths: Vec<usize>) {
+    fn columns_numbers(#[case] s: &str, #[case] token_end_indices: Vec<usize>) {
         let mut lexer = Lexer::new(s);
-        for len in token_lengths {
+        for len in token_end_indices {
             (lexer, _) = lexer.lex_one();
             assert_eq!(0, lexer.line_num);
             assert_eq!(len, lexer.col_num);
