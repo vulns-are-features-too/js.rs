@@ -166,6 +166,7 @@ where
                 '\'' => self.transition::<JsString<'\''>>().lex(i),
                 '`' => self.transition::<JsString<'`'>>().lex(i),
                 _ => {
+                    self.next_char();
                     let token = Token::Invalid(&self.input[i..=i]);
                     (self, token)
                 }
@@ -217,5 +218,38 @@ mod tests {
             assert_eq!(0, lexer.line_num);
             assert_eq!(len, lexer.col_num);
         }
+    }
+
+    #[test]
+    fn invalid_single() {
+        let expected = vec![Token::Invalid("\0"), Token::Eof];
+        let tokens = lex("\0");
+        assert_eq!(expected, tokens);
+    }
+
+    #[test]
+    fn invalid_multiple() {
+        let expected = vec![
+            Token::Invalid("\0"),
+            Token::Invalid("\0"),
+            Token::Invalid("\0"),
+            Token::Eof,
+        ];
+        let tokens = lex("\0\0\0");
+        assert_eq!(expected, tokens);
+    }
+
+    #[test]
+    fn invalid_amidst_valid() {
+        let expected = vec![
+            Token::Decimal("1"),
+            Token::Invalid("\0"),
+            Token::Identifier("a"),
+            Token::Invalid("\0"),
+            Token::Identifier("Z"),
+            Token::Eof,
+        ];
+        let tokens = lex("1\0a\0Z");
+        assert_eq!(expected, tokens);
     }
 }
