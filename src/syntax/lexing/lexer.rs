@@ -291,10 +291,7 @@ mod tests {
 
     #[test]
     fn total_len() {
-        for file in read_dir("tests/js_files/")
-            .unwrap()
-            .map(|x| x.unwrap().path())
-        {
+        for file in test_files() {
             let content = fs::read_to_string(&file).unwrap();
             let expected_len = content.len();
             let tokens = lex_all(&content);
@@ -305,10 +302,7 @@ mod tests {
 
     #[test]
     fn tokens_dont_overlap() {
-        for file in read_dir("tests/js_files/")
-            .unwrap()
-            .map(|x| x.unwrap().path())
-        {
+        for file in test_files() {
             let mut expected_offset = 0;
             let content = &fs::read_to_string(&file).unwrap();
 
@@ -332,5 +326,11 @@ mod tests {
             // make sure something actually got lexed
             assert!(expected_offset > 0);
         }
+    }
+
+    fn test_files() -> impl Iterator<Item = std::path::PathBuf> {
+        read_dir("tests/js_files/")
+            .unwrap()
+            .map(|x| x.unwrap().path())
     }
 }
