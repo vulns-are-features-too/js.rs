@@ -77,6 +77,7 @@ impl<'i, State> Lexer<'i, State>
 where
     State: LexerState,
 {
+    #[must_use]
     pub const fn transition<NewState: LexerState>(self) -> Lexer<'i, NewState> {
         Lexer {
             _s: PhantomData::<NewState>,
@@ -247,6 +248,7 @@ pub fn lex(input: &str) -> impl Iterator<Item = Token<'_>> {
 ///     tokens
 /// );
 /// ```
+#[must_use]
 pub fn lex_all(input: &str) -> Vec<Token<'_>> {
     lex(input).collect()
 }

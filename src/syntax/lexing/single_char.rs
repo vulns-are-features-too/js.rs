@@ -7,6 +7,7 @@ impl<'i, 'o> Lexer<'i, Base>
 where
     'i: 'o,
 {
+    #[must_use]
     pub fn single_char(mut self, token: Token<'o>) -> (Self, Token<'o>) {
         self.next_char();
         (self.transition(), token)

@@ -11,6 +11,7 @@ impl<'i, 'o> Lexer<'i, Div>
 where
     'i: 'o,
 {
+    #[must_use]
     pub fn lex(mut self, start: usize) -> (Lexer<'i, Base>, Token<'o>) {
         self.next_char();
 

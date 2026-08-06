@@ -13,6 +13,7 @@ impl<'i, 'o> Lexer<'i, LF>
 where
     'i: 'o,
 {
+    #[must_use]
     pub fn lex(mut self, start: usize) -> (Lexer<'i, Base>, Token<'o>) {
         self.col_num = 0;
         self.line_num += 1;
@@ -26,6 +27,7 @@ impl<'i, 'o> Lexer<'i, CR>
 where
     'i: 'o,
 {
+    #[must_use]
     pub fn lex(mut self, start: usize) -> (Lexer<'i, Base>, Token<'o>) {
         self.col_num = 0;
         self.line_num += 1;

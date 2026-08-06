@@ -11,6 +11,7 @@ impl<'i, 'o> Lexer<'i, KeyworkOrIdentifier>
 where
     'i: 'o,
 {
+    #[must_use]
     pub fn lex(mut self, start: usize) -> (Lexer<'i, Base>, Token<'o>) {
         let mut end = start;
         while let Some(&(_, c2)) = self.chars.peek()

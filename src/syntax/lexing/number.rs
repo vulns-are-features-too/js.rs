@@ -23,6 +23,7 @@ impl<'i, 'o> Lexer<'i, Number>
 where
     'i: 'o,
 {
+    #[must_use]
     pub fn lex(self, start: usize, c: char) -> (Lexer<'i, Base>, Token<'o>) {
         match c {
             '0' => self.transition::<NumberLeading0>().lex(start),
