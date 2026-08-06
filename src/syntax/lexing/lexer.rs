@@ -236,6 +236,7 @@ mod tests {
 
     use super::*;
     use rstest::*;
+    use std::fs::{self, read_dir};
 
     #[rstest]
     #[case("int ABCD yz", vec![3, 4, 8, 9, 11])]
@@ -286,5 +287,19 @@ mod tests {
         ];
         let tokens = lex_all("1\0a\0Z");
         assert_eq!(expected, tokens);
+    }
+
+    #[test]
+    fn total_len() {
+        for file in read_dir("tests/js_files/")
+            .unwrap()
+            .map(|x| x.unwrap().path())
+        {
+            let content = fs::read_to_string(&file).unwrap();
+            let expected_len = content.len();
+            let tokens = lex_all(&content);
+            let total_len = tokens.iter().map(|t| t.len()).sum();
+            assert_eq!(expected_len, total_len, "{:?}", file.file_name().unwrap());
+        }
     }
 }
