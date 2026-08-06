@@ -66,6 +66,7 @@ where
         self.chars.next();
     }
 
+    #[must_use]
     pub fn eat(&mut self, ch: char) -> bool {
         match self.chars.peek() {
             Some(&(_, c)) if c == ch => {
@@ -81,6 +82,7 @@ impl<'i, 'o> Lexer<'i, Base>
 where
     'i: 'o,
 {
+    #[must_use]
     fn new(input: &'i str) -> Self {
         Self {
             input,
@@ -91,6 +93,7 @@ where
         }
     }
 
+    #[must_use]
     const fn curr_point(&self) -> Point {
         Point {
             line: self.line_num,
@@ -98,6 +101,7 @@ where
         }
     }
 
+    #[must_use]
     fn lex_one(mut self) -> (Self, Token<'o>) {
         if let Some(&(i, c)) = self.chars.peek() {
             return match c {
@@ -149,6 +153,7 @@ where
         (self, Token::Eof)
     }
 
+    #[must_use]
     fn lex(self) -> Vec<Token<'o>> {
         self.stream().collect()
     }
