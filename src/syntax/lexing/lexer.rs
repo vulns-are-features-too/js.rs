@@ -29,33 +29,6 @@ use crate::{
     locations::Point,
 };
 
-#[derive(Debug)]
-pub enum LexingError {
-    InvalidChar {
-        point: Point,
-        c: char,
-    },
-    InvalidNumber {
-        point: Point,
-        num_str: String,
-        parse_err: String,
-    },
-}
-
-impl LexingError {
-    const fn invalid_char(point: Point, c: char) -> Self {
-        Self::InvalidChar { point, c }
-    }
-
-    const fn invalid_number(point: Point, num_str: String, parse_err: String) -> Self {
-        Self::InvalidNumber {
-            point,
-            num_str,
-            parse_err,
-        }
-    }
-}
-
 pub trait LexerState {}
 
 pub struct Base;
