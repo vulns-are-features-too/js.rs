@@ -28,14 +28,14 @@ where
 mod tests {
 
     use super::*;
-    use crate::syntax::lexing::lexer::lex;
+    use crate::syntax::lexing::lexer::lex_all;
     use rstest::*;
 
     #[rstest]
     #[case("%", Token::Percent(0))]
     #[case("%=", Token::PercentEqual(0))]
     fn single(#[case] s: &str, #[case] expected: Token) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         assert_eq!(expected, tokens[0]);
         assert_eq!(2, tokens.len());
         assert_eq!(Token::Eof, tokens[1]);
@@ -43,7 +43,7 @@ mod tests {
 
     #[test]
     fn mixed() {
-        let tokens = lex("a%=b%c");
+        let tokens = lex_all("a%=b%c");
         assert_eq!(
             vec![
                 Token::Identifier("a"),

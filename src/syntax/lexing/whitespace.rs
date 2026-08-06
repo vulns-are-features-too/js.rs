@@ -29,7 +29,7 @@ where
 mod tests {
 
     use super::*;
-    use crate::syntax::lexing::lexer::lex;
+    use crate::syntax::lexing::lexer::lex_all;
     use rstest::*;
 
     #[rstest]
@@ -37,7 +37,7 @@ mod tests {
     #[case("\t")]
     #[case(" \t ")]
     fn single(#[case] s: &str) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         let expected = Token::WhiteSpace(s);
         assert_eq!(expected, tokens[0]);
         assert_eq!(2, tokens.len());
@@ -60,7 +60,7 @@ mod tests {
     #[case("\t; ", 2)]
     #[case("\t;\t", 2)]
     fn count(#[case] s: &str, #[case] expected: usize) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         let count = tokens
             .iter()
             .filter(|x| matches!(x, Token::WhiteSpace(_)))

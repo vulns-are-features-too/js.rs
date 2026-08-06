@@ -38,7 +38,7 @@ where
 mod tests {
 
     use super::*;
-    use crate::syntax::lexing::lexer::lex;
+    use crate::syntax::lexing::lexer::lex_all;
     use rstest::*;
 
     #[rstest]
@@ -47,7 +47,7 @@ mod tests {
     #[case("===", Token::Equal3(0))]
     #[case("=>", Token::Arrow(0))]
     fn single(#[case] s: &str, #[case] expected: Token) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         assert_eq!(expected, tokens[0]);
         assert_eq!(2, tokens.len());
         assert_eq!(Token::Eof, tokens[1]);
@@ -68,7 +68,7 @@ mod tests {
                 Token::Identifier("e"),
                 Token::Eof,
             ],
-            lex("a=b==c===d=>e")
+            lex_all("a=b==c===d=>e")
         );
     }
 }

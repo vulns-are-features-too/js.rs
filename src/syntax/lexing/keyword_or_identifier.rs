@@ -85,7 +85,7 @@ where
 mod tests {
 
     use super::*;
-    use crate::syntax::lexing::lexer::lex;
+    use crate::syntax::lexing::lexer::lex_all;
     use rstest::*;
 
     #[rstest]
@@ -144,7 +144,7 @@ mod tests {
     #[case("protected", Token::Protected(0))]
     #[case("public", Token::Public(0))]
     fn keyword(#[case] s: &str, #[case] expected: Token) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         assert_eq!(expected, tokens[0]);
         assert_eq!(2, tokens.len());
         assert_eq!(Token::Eof, tokens[1]);
@@ -161,7 +161,7 @@ mod tests {
     #[case("_x")]
     #[case("_1")]
     fn single_identifier(#[case] s: &str) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         let expected = Token::Identifier(s);
         assert_eq!(expected, tokens[0]);
         assert_eq!(2, tokens.len());
@@ -174,7 +174,7 @@ mod tests {
     #[case("_X _y _Z", vec![Token::Identifier("_X"), Token::WhiteSpace(" "), Token::Identifier("_y"), Token::WhiteSpace(" "), Token::Identifier("_Z"), Token::Eof])]
     #[case("public class Foo", vec![Token::Public(0), Token::WhiteSpace(" "), Token::Class(7), Token::WhiteSpace(" "), Token::Identifier("Foo"), Token::Eof])]
     fn identifiers(#[case] s: &str, #[case] expected: Vec<Token>) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         assert_eq!(expected, tokens);
     }
 }

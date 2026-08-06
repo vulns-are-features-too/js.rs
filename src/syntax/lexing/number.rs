@@ -234,7 +234,7 @@ where
 mod tests {
 
     use super::*;
-    use crate::syntax::lexing::lexer::lex;
+    use crate::syntax::lexing::lexer::lex_all;
     use rstest::*;
 
     #[rstest]
@@ -293,7 +293,7 @@ mod tests {
     #[case("08n", Token::BigInt("08n"))]
     #[case("088n", Token::BigInt("088n"))]
     fn single(#[case] s: &str, #[case] expected: Token) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         assert_eq!(expected, tokens[0]);
         assert_eq!(2, tokens.len());
         assert_eq!(Token::Eof, tokens[1]);
@@ -316,7 +316,7 @@ mod tests {
     #[case("0079 0077 0078", vec![Token::Decimal("0079"), Token::WhiteSpace(" "), Token::Octal("0077"), Token::WhiteSpace(" "), Token::Decimal("0078"), Token::Eof])]
     #[case("0079n 0077n 0078n", vec![Token::BigInt("0079n"), Token::WhiteSpace(" "), Token::BigOct("0077n"), Token::WhiteSpace(" "), Token::BigInt("0078n"), Token::Eof])]
     fn numbers(#[case] s: &str, #[case] expected: Vec<Token>) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         assert_eq!(expected, tokens);
     }
 }

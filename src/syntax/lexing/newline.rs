@@ -44,7 +44,7 @@ where
 mod tests {
 
     use super::*;
-    use crate::syntax::lexing::lexer::lex;
+    use crate::syntax::lexing::lexer::lex_all;
     use rstest::*;
 
     #[rstest]
@@ -53,7 +53,7 @@ mod tests {
     #[case("\r\n")]
     #[case("\r")]
     fn single(#[case] s: &str) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         let expected = Token::NewLine(s);
         assert_eq!(expected, tokens[0]);
         assert_eq!(2, tokens.len());
@@ -86,7 +86,7 @@ mod tests {
     #[case("\n \r", 2)]
     #[case(" \r \n ", 2)]
     fn count_new_lines(#[case] s: &str, #[case] expected: usize) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         let count = tokens
             .iter()
             .filter(|x| matches!(x, Token::NewLine(_)))

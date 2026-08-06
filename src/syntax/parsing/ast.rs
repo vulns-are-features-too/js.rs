@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::syntax::{
-    lexing::lexer::{LexingError, lex},
+    lexing::lexer::{LexingError, lex_all},
     parsing::parser::{ParsingError, parse},
 };
 
@@ -18,7 +18,7 @@ impl FromStr for Ast {
     type Err = SyntaxError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         parse(tokens).map_err(SyntaxError::Parsing)
     }
 }

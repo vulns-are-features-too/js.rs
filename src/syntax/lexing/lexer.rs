@@ -175,25 +175,37 @@ where
         (self, Token::Eof)
     }
 
-    fn lex(mut self) -> Vec<Token<'o>> {
-        let mut tokens: Vec<Token<'o>> = vec![];
-        loop {
-            let (new_self, token) = self.lex_one();
-            self = new_self;
+    fn lex(self) -> Vec<Token<'o>> {
+        self.stream().collect()
+    }
 
-            match token {
-                Token::Eof => {
-                    tokens.push(Token::Eof);
-                    return tokens;
-                }
-                _ => tokens.push(token),
-            }
-        }
+    pub fn stream(self) -> impl Iterator<Item = Token<'i>> {
+        LexIter { lexer: Some(self) }
     }
 }
 
-pub fn lex(input: &str) -> Vec<Token<'_>> {
-    Lexer::new(input).lex()
+struct LexIter<'i> {
+    lexer: Option<Lexer<'i, Base>>,
+}
+
+impl<'i> Iterator for LexIter<'i> {
+    type Item = Token<'i>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (lexer, token) = self.lexer.take()?.lex_one();
+        if !matches!(token, Token::Eof) {
+            self.lexer = Some(lexer);
+        }
+        Some(token)
+    }
+}
+
+pub fn lex(input: &str) -> impl Iterator<Item = Token<'_>> {
+    Lexer::new(input).stream()
+}
+
+pub fn lex_all(input: &str) -> Vec<Token<'_>> {
+    lex(input).collect()
 }
 
 #[cfg(test)]
@@ -223,7 +235,7 @@ mod tests {
     #[test]
     fn invalid_single() {
         let expected = vec![Token::Invalid("\0"), Token::Eof];
-        let tokens = lex("\0");
+        let tokens = lex_all("\0");
         assert_eq!(expected, tokens);
     }
 
@@ -235,7 +247,7 @@ mod tests {
             Token::Invalid("\0"),
             Token::Eof,
         ];
-        let tokens = lex("\0\0\0");
+        let tokens = lex_all("\0\0\0");
         assert_eq!(expected, tokens);
     }
 
@@ -249,7 +261,7 @@ mod tests {
             Token::Identifier("Z"),
             Token::Eof,
         ];
-        let tokens = lex("1\0a\0Z");
+        let tokens = lex_all("1\0a\0Z");
         assert_eq!(expected, tokens);
     }
 }

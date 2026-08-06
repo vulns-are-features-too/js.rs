@@ -38,7 +38,7 @@ where
 mod tests {
 
     use super::*;
-    use crate::syntax::lexing::lexer::lex;
+    use crate::syntax::lexing::lexer::lex_all;
     use rstest::*;
 
     #[rstest]
@@ -47,7 +47,7 @@ mod tests {
     #[case("??=", Token::Question2Equal(0))]
     #[case("?.", Token::QuestionDot(0))]
     fn single(#[case] s: &str, #[case] expected: Token) {
-        let tokens = lex(s);
+        let tokens = lex_all(s);
         assert_eq!(expected, tokens[0]);
         assert_eq!(2, tokens.len());
         assert_eq!(Token::Eof, tokens[1]);
@@ -55,7 +55,7 @@ mod tests {
 
     #[test]
     fn mixed() {
-        let tokens = lex("a??=b?.c??d?e");
+        let tokens = lex_all("a??=b?.c??d?e");
         assert_eq!(
             vec![
                 Token::Identifier("a"),
