@@ -302,4 +302,35 @@ mod tests {
             assert_eq!(expected_len, total_len, "{:?}", file.file_name().unwrap());
         }
     }
+
+    #[test]
+    fn tokens_dont_overlap() {
+        for file in read_dir("tests/js_files/")
+            .unwrap()
+            .map(|x| x.unwrap().path())
+        {
+            let mut expected_offset = 0;
+            let content = &fs::read_to_string(&file).unwrap();
+
+            for token in lex(content) {
+                if matches!(token, Token::Eof) {
+                    break;
+                }
+
+                let offset = token.offset(content).unwrap();
+                assert_eq!(
+                    expected_offset,
+                    offset,
+                    "{:?}: {:?}",
+                    file.file_name().unwrap(),
+                    token
+                );
+
+                expected_offset = offset + token.len();
+            }
+
+            // make sure something actually got lexed
+            assert!(expected_offset > 0);
+        }
+    }
 }
