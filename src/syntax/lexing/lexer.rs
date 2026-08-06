@@ -323,8 +323,10 @@ mod tests {
                 expected_offset = offset + token.len();
             }
 
-            // make sure something actually got lexed
-            assert!(expected_offset > 0);
+            if !content.is_empty() {
+                // make sure something actually got lexed
+                assert!(expected_offset > 0);
+            }
         }
     }
 
