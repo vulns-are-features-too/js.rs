@@ -4,7 +4,7 @@ use std::{
     str::Chars,
 };
 
-use crate::syntax::{
+use crate::{
     lexing::{
         ampersand::Ampersand,
         bang::Bang,
@@ -200,10 +200,53 @@ impl<'i> Iterator for LexIter<'i> {
     }
 }
 
+/// Lex 1 token at a time
+///
+/// ```
+/// use syntax::lexing::{lexer::lex, tokens::Token};
+///
+/// let input = "var x = 5;";
+///
+/// for token in lex("var x = 5;") {
+///     println!("{:?}", token);
+/// }
+///
+/// let mut lexer = lex(input);
+/// assert_eq!(Some(Token::Var(0)), lexer.next());
+/// assert_eq!(Some(Token::WhiteSpace(" ")), lexer.next());
+/// assert_eq!(Some(Token::Identifier("x")), lexer.next());
+/// assert_eq!(Some(Token::WhiteSpace(" ")), lexer.next());
+/// assert_eq!(Some(Token::Equal(6)), lexer.next());
+/// assert_eq!(Some(Token::WhiteSpace(" ")), lexer.next());
+/// assert_eq!(Some(Token::Decimal("5")), lexer.next());
+/// assert_eq!(Some(Token::SemiColon(9)), lexer.next());
+/// assert_eq!(Some(Token::Eof), lexer.next());
+/// assert_eq!(None, lexer.next());
+/// ```
 pub fn lex(input: &str) -> impl Iterator<Item = Token<'_>> {
     Lexer::new(input).stream()
 }
 
+/// Lex everything at once
+///
+/// ```
+/// use syntax::lexing::{lexer::lex_all, tokens::Token};
+/// let tokens = lex_all("var x = 5;");
+/// assert_eq!(
+///     vec![
+///         Token::Var(0),
+///         Token::WhiteSpace(" "),
+///         Token::Identifier("x"),
+///         Token::WhiteSpace(" "),
+///         Token::Equal(6),
+///         Token::WhiteSpace(" "),
+///         Token::Decimal("5"),
+///         Token::SemiColon(9),
+///         Token::Eof,
+///     ],
+///     tokens
+/// );
+/// ```
 pub fn lex_all(input: &str) -> Vec<Token<'_>> {
     lex(input).collect()
 }

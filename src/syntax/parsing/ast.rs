@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::syntax::{
+use crate::{
     lexing::lexer::{LexingError, lex_all},
     parsing::parser::{ParsingError, parse},
 };

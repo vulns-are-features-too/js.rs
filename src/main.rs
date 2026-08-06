@@ -1,7 +1,5 @@
-mod syntax;
-
-use crate::syntax::parsing::ast;
 use std::str::FromStr;
+use syntax::parsing::ast;
 
 fn main() {
     let filename = std::env::args().next().expect("provide js file");

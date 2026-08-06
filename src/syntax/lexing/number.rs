@@ -1,4 +1,4 @@
-use crate::syntax::lexing::{
+use crate::lexing::{
     lexer::{Base, Lexer, LexerState},
     tokens::Token,
 };
@@ -234,7 +234,7 @@ where
 mod tests {
 
     use super::*;
-    use crate::syntax::lexing::lexer::lex_all;
+    use crate::lexing::lexer::lex_all;
     use rstest::*;
 
     #[rstest]

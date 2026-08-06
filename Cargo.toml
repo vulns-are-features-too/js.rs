@@ -17,6 +17,10 @@ repository = "https://github.com/vulns-are-features-too/js.rs"
 license = "MIT"
 readme = "README.md"
 
+[lib]
+name = "syntax"
+path = "src/syntax/lib.rs"
+
 [dependencies]
 eq-float = "0.1.0"
 
