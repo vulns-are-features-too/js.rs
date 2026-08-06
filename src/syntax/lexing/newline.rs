@@ -58,6 +58,7 @@ mod tests {
         let tokens = lex_all(s);
         let expected = Token::NewLine(s);
         assert_eq!(expected, tokens[0]);
+        assert_eq!(s.len(), tokens[0].len());
         assert_eq!(2, tokens.len());
         assert_eq!(Token::Eof, tokens[1]);
     }

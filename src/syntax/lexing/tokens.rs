@@ -160,3 +160,157 @@ pub enum Token<'a> {
     Invalid(&'a str),
     Eof,
 }
+
+impl Token<'_> {
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
+    pub const fn len(&self) -> usize {
+        match self {
+            Token::Identifier(s)
+            | Token::Decimal(s)
+            | Token::Exponential(s)
+            | Token::BigExpDec(s)
+            | Token::BigInt(s)
+            | Token::Binary(s)
+            | Token::BigBin(s)
+            | Token::ExpBin(s)
+            | Token::BigExpBin(s)
+            | Token::Octal(s)
+            | Token::BigOct(s)
+            | Token::ExpOct(s)
+            | Token::BigExpOct(s)
+            | Token::Hexadecimal(s)
+            | Token::BigHex(s)
+            | Token::String(s)
+            | Token::Regex(s)
+            | Token::Template(s)
+            | Token::WhiteSpace(s)
+            | Token::NewLine(s)
+            | Token::Invalid(s) => s.len(),
+
+            Token::LeftParen(_)
+            | Token::RightParen(_)
+            | Token::LeftBracket(_)
+            | Token::RightBracket(_)
+            | Token::LeftBrace(_)
+            | Token::RightBrace(_)
+            | Token::Bang(_)
+            | Token::Equal(_)
+            | Token::Greater(_)
+            | Token::Less(_)
+            | Token::Plus(_)
+            | Token::Minus(_)
+            | Token::Star(_)
+            | Token::Div(_)
+            | Token::Percent(_)
+            | Token::Ampersand(_)
+            | Token::Pipe(_)
+            | Token::Caret(_)
+            | Token::Tilde(_)
+            | Token::Dot(_)
+            | Token::Comma(_)
+            | Token::Colon(_)
+            | Token::SemiColon(_)
+            | Token::Question(_) => 1,
+
+            Token::Do(_)
+            | Token::If(_)
+            | Token::In(_)
+            | Token::As(_)
+            | Token::Of(_)
+            | Token::BangEqual(_)
+            | Token::Equal2(_)
+            | Token::Greater2(_)
+            | Token::GreaterEqual(_)
+            | Token::Less2(_)
+            | Token::LessEqual(_)
+            | Token::Plus2(_)
+            | Token::PlusEqual(_)
+            | Token::Minus2(_)
+            | Token::MinusEqual(_)
+            | Token::Star2(_)
+            | Token::StarEqual(_)
+            | Token::DivEqual(_)
+            | Token::PercentEqual(_)
+            | Token::Ampersand2(_)
+            | Token::AmpersandEqual(_)
+            | Token::Pipe2(_)
+            | Token::PipeEqual(_)
+            | Token::Dot2(_)
+            | Token::Question2(_)
+            | Token::QuestionDot(_)
+            | Token::Arrow(_) => 2,
+
+            Token::For(_)
+            | Token::New(_)
+            | Token::Try(_)
+            | Token::Var(_)
+            | Token::Let(_)
+            | Token::Get(_)
+            | Token::Set(_)
+            | Token::BangEqual2(_)
+            | Token::Equal3(_)
+            | Token::Greater3(_)
+            | Token::Greater2Equal(_)
+            | Token::Less2Equal(_)
+            | Token::Star2Equal(_)
+            | Token::Ampersand2Equal(_)
+            | Token::Pipe2Equal(_)
+            | Token::Dot3(_)
+            | Token::Question2Equal(_)
+            | Token::BackSlash(_) => 3,
+
+            Token::Null(_)
+            | Token::True(_)
+            | Token::Case(_)
+            | Token::Else(_)
+            | Token::This(_)
+            | Token::Void(_)
+            | Token::With(_)
+            | Token::Eval(_)
+            | Token::From(_)
+            | Token::Enum(_)
+            | Token::Greater3Equal(_) => 4,
+
+            Token::False(_)
+            | Token::Break(_)
+            | Token::Catch(_)
+            | Token::Class(_)
+            | Token::Const(_)
+            | Token::Super(_)
+            | Token::Throw(_)
+            | Token::While(_)
+            | Token::Yield(_)
+            | Token::Await(_)
+            | Token::Async(_) => 5,
+
+            Token::Delete(_)
+            | Token::Export(_)
+            | Token::Import(_)
+            | Token::Return(_)
+            | Token::Switch(_)
+            | Token::Typeof(_)
+            | Token::Static(_)
+            | Token::Public(_) => 6,
+
+            Token::Default(_)
+            | Token::Extends(_)
+            | Token::Finally(_)
+            | Token::Package(_)
+            | Token::Private(_) => 7,
+
+            Token::Continue(_) | Token::Debugger(_) | Token::Function(_) => 8,
+
+            Token::Arguments(_) | Token::Interface(_) | Token::Protected(_) => 9,
+
+            Token::Instanceof(_) | Token::Implements(_) => 10,
+
+            Token::Eof => 0,
+        }
+    }
+
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}

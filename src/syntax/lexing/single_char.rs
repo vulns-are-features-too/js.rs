@@ -36,6 +36,7 @@ mod tests {
     fn single_token(#[case] s: &str, #[case] expected: Token) {
         let tokens = lex_all(s);
         assert_eq!(expected, tokens[0]);
+        assert_eq!(1, tokens[0].len());
         assert_eq!(2, tokens.len());
         assert_eq!(Token::Eof, tokens[1]);
     }
