@@ -16,5 +16,6 @@ mod plus;
 mod question;
 mod single_char;
 mod star;
+mod string;
 pub mod tokens;
 mod whitespace;

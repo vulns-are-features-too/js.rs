@@ -22,6 +22,7 @@ use crate::syntax::{
         plus::Plus,
         question::Question,
         star::Star,
+        string::JsString,
         tokens::Token,
         whitespace::WhiteSpace,
     },
@@ -161,6 +162,9 @@ where
                 '|' => self.transition::<Pipe>().lex(i),
                 '.' => self.transition::<Dot>().lex(i),
                 '?' => self.transition::<Question>().lex(i),
+                '"' => self.transition::<JsString<'"'>>().lex(i),
+                '\'' => self.transition::<JsString<'\''>>().lex(i),
+                '`' => self.transition::<JsString<'`'>>().lex(i),
                 _ => {
                     let token = Token::Invalid(&self.input[i..=i]);
                     (self, token)
