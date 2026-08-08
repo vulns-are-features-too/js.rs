@@ -8,3 +8,6 @@ lint:
 
 fmt:
   cargo fmt
+
+fuzz TARGET *FLAGS:
+  cargo +nightly fuzz run --fuzz-dir tests/fuzz {{FLAGS}} {{TARGET}}
